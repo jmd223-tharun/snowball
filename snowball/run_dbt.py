@@ -11,8 +11,8 @@ import sys
 import json
 import zipfile
 import shutil
-from .config import *
 import subprocess
+from .config import *
 from datetime import datetime
 from dbt.cli.main import dbtRunner
 import nbformat as nbf
@@ -379,6 +379,4 @@ def main():
         print("❌ Invalid choice. Please enter either 1, 2 or 3.")
 
 if __name__ == "__main__":
-
     main()
-

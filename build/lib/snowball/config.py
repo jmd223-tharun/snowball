@@ -9,9 +9,9 @@ config.py
 
 # === Project paths === #
 profiles_dir = r"C:\Users\KonduruTharun\.dbt"
-project_dir  = r"C:\Works\SnowballDBT\snowball_test\snowball_dbt"
-mapping_file = r"C:\Works\SnowballDBT\snowball_test\snowball_dbt\seeds\column_mapping.csv"
-output_dir   = r"C:\Works\SnowballDBT\snowball_test"
+project_dir  = r"C:\Users\KonduruTharun\Downloads\snowball_dbt\seeds"
+mapping_file = r"C:\Users\KonduruTharun\Downloads\snowball_dbt\seeds\column_mapping.csv"
+output_dir   = r"C:\Users\KonduruTharun\Downloads\snowball_test"
 
 # === Database configuration === #
 db_vars = {

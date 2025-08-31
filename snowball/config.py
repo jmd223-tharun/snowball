@@ -27,4 +27,3 @@ db_vars = {
     1 -> Update the given referencing file as per your's tables fields name
     2 -> Run : python run_dbt.py
 """
-
