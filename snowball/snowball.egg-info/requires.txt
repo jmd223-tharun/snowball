@@ -1,4 +1,0 @@
-dbt-core
-sqlfluff
-nbformat
-pyspark
