@@ -11,6 +11,7 @@ import sys
 import json
 import zipfile
 import shutil
+from .config import *
 import subprocess
 from datetime import datetime
 from dbt.cli.main import dbtRunner
@@ -380,3 +381,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+
