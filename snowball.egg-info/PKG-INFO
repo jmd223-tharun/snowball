@@ -1,10 +1,10 @@
 Metadata-Version: 2.4
 Name: snowball
-Version: 1.0.5
+Version: 1.0.6
 Summary: Generate compiled dbt projects and PySpark notebooks.
 Home-page: https://gitserver/org/dbt_runner
 Author: Vishal Verma
-Author-email: kondurutharun@jmangroup.com
+Author-email: vishal.verma@jmangroup.com
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
@@ -75,5 +75,5 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-For any questions or issues, contact Vishal Verma <kondurutharun@jmangroup.com>.
+For any questions or issues, contact Vishal Verma <vishal.verma@jmangroup.com>.
 

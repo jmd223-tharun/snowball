@@ -11,12 +11,12 @@ except FileNotFoundError:
 
 setup(
     name="snowball",      
-    version="1.0.5",                            # Package version
+    version="1.0.6",                            # Package version
     description="Generate compiled dbt projects and PySpark notebooks.",
     long_description=long_description,          # Long description (usually README content)
     long_description_content_type="text/markdown",
     author="Vishal Verma",                         # Author name
-    author_email="kondurutharun@jmangroup.com",
+    author_email="vishal.verma@jmangroup.com",
     url="https://gitserver/org/dbt_runner",    # URL of project homepage or repo
     packages=find_packages(),                   # Automatically find packages inside your project directory
     install_requires=[                          # List dependencies your package requires

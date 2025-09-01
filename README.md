@@ -47,5 +47,5 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-For any questions or issues, contact Vishal Verma <kondurutharun@jmangroup.com>.
+For any questions or issues, contact Vishal Verma <vishal.verma@jmangroup.com>.
 

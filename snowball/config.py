@@ -9,7 +9,7 @@ config.py
 
 # === Project paths === #
 profiles_dir = r"C:\Users\KonduruTharun\.dbt"
-project_dir  = r"C:\Users\KonduruTharun\Downloads\snowball_dbt\seeds"
+project_dir  = r"C:\Users\KonduruTharun\Downloads\snowball_dbt"
 mapping_file = r"C:\Users\KonduruTharun\Downloads\snowball_dbt\seeds\column_mapping.csv"
 output_dir   = r"C:\Users\KonduruTharun\Downloads\snowball_test"
 
