@@ -2,3 +2,7 @@ dbt-core
 sqlfluff
 nbformat
 pyspark
+dbt-sqlserver==1.9.0
+dbt-fabric
+dbt-snowflake
+dbt-databricks
