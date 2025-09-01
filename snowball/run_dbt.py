@@ -26,10 +26,15 @@ output_zip    = os.path.join(output_dir, "compiled_models.zip")
 dbt_seed_dir  = os.path.join(project_dir, "seeds")
 notebooks_dir = os.path.join(output_dir, "notebooks")
 
-compiled_models_dir = os.path.join(compiled_dir, "Snowball_dbt", "models")
 project_root = project_dir
 os.chdir(project_root)
 
+def cleanup_previous_run():
+    """Clean up previous compiled files and notebooks"""
+    for dir_path in [compiled_dir, notebooks_dir]:
+        if os.path.exists(dir_path):
+            shutil.rmtree(dir_path)
+            print(f"🧹 Cleaned up: {dir_path}")
 
 def run_dbt_deps():
     """Run dbt deps to install dependencies"""
@@ -41,33 +46,39 @@ def run_dbt_deps():
     dbt = dbtRunner()
     return dbt.invoke(deps_args)
 
-
 def run_dbt():
     """Run all dbt models"""
-    deps_args = [
+    run_args = [
         "run",
         "--project-dir", project_dir,
         "--profiles-dir", profiles_dir
     ]
     dbt = dbtRunner()
-    return dbt.invoke(deps_args)
+    return dbt.invoke(run_args)
 
+def run_pre_run_setup():
+    """Run the pre_run_setup macro"""
+    macro_args = [
+        "run-operation",
+        "pre_run_setup",
+        "--project-dir", project_dir,
+        "--profiles-dir", profiles_dir
+    ]
+    dbt = dbtRunner()
+    return dbt.invoke(macro_args)
 
 def build_dbt_compile_args():
     """Build arguments for dbt compile"""
     return [
         "compile",
         "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir,
-        "--target", "dev"
+        "--profiles-dir", profiles_dir
     ]
 
-
-def run_dbt(cli_args):
+def run_dbt_args(cli_args):
     """Run dbt with given arguments"""
     dbt = dbtRunner()
     return dbt.invoke(cli_args)
-
 
 def zip_directory(source_dir, zip_path):
     """Zip the contents of an entire directory"""
@@ -77,7 +88,6 @@ def zip_directory(source_dir, zip_path):
                 file_path = os.path.join(root, file)
                 arcname = os.path.relpath(file_path, source_dir)
                 zipf.write(file_path, arcname)
-
 
 def run_sqlfluff_on_directory(directory_path):
     """
@@ -125,7 +135,6 @@ def run_sqlfluff_on_directory(directory_path):
         print(f"❌ Unexpected error with SQLFluff for {directory_path}: {e}")
         return False
 
-
 def apply_sqlfluff_to_compiled():
     """
     Apply SQLFluff to all compiled SQL files before packaging.
@@ -141,77 +150,91 @@ def apply_sqlfluff_to_compiled():
     # Run SQLFluff on the compiled models directory
     return run_sqlfluff_on_directory(compiled_dir)
 
-
 def generate_notebooks():
     """Generate Jupyter notebooks from compiled SQL by model folder"""
-    os.makedirs(notebooks_dir, exist_ok=True)
+    try:
+        os.makedirs(notebooks_dir, exist_ok=True)
 
-    model_folders = set()
-    for root, _, files in os.walk(compiled_dir):
-        for file in files:
-            if file.endswith('.sql'):
-                rel_path = os.path.relpath(root, compiled_dir)
-                if rel_path != '.':
-                    model_folders.add(rel_path.split(os.sep)[-1])
-
-    for folder in model_folders:
-        notebook_path = os.path.join(notebooks_dir, f"{folder}_nb.ipynb")
-        nb = new_notebook()
-        
-        folder_name = folder.upper().split('_')[-1]
-        nb.cells.append(new_markdown_cell(
-            "## SNOWBALL Spark SQL version\n"
-            f"#### **Notebook to create {folder_name} layer**\n"
-            f"##### **Creating {folder_name} schema to create required {folder_name} tables**\n"
-        ))
-        nb.cells.append(new_code_cell(f"%%sql\nCREATE SCHEMA IF NOT EXISTS {folder.split('_')[-1]};"))
-
-        if folder == 'tests':
-            folder_path = os.path.join(compiled_dir, 'Snowball_dbt', folder)
-        else:            
-            folder_path = os.path.join(compiled_dir, 'Snowball_dbt', 'models', folder)
-
-        for root, _, files in os.walk(folder_path):
-            for file in sorted(files):
+        model_folders = set()
+        for root, _, files in os.walk(compiled_dir):
+            for file in files:
                 if file.endswith('.sql'):
-                    file_path = os.path.join(root, file)
-                    model_name = os.path.splitext(file)[0]
-                    
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        sql_content = f.read()                    
-                    nb.cells.append(new_markdown_cell(f"##### **{model_name}**"))
-                    nb.cells.append(new_code_cell(
-                        f"%%sql\n"
-                        f"DROP TABLE IF EXISTS {folder.split('_')[-1]}.{model_name};\n"
-                        f"CREATE TABLE {folder.split('_')[-1]}.{model_name} AS\n"
-                        f"{sql_content}"
-                    ))
-        with open(notebook_path, 'w', encoding='utf-8') as f:
-            nbf.write(nb, f)
-        print(f"📓 Generated: {os.path.basename(notebook_path)}") 
+                    rel_path = os.path.relpath(root, compiled_dir)
+                    if rel_path != '.':
+                        folder_name = rel_path.split(os.sep)[-1]
+                        if folder_name != "models":
+                            model_folders.add(folder_name)
 
+        for folder in model_folders:
+            if folder == "models":
+                continue
+                
+            notebook_path = os.path.join(notebooks_dir, f"{folder}_nb.ipynb")
+            nb = new_notebook()
+            
+            folder_name = folder.upper().split('_')[-1]
+            nb.cells.append(new_markdown_cell(
+                "## SNOWBALL Spark SQL version\n"
+                f"#### **Notebook to create {folder_name} layer**\n"
+                f"##### **Creating {folder_name} schema to create required {folder_name} tables**\n"
+            ))
+            nb.cells.append(new_code_cell(f"%%sql\nCREATE SCHEMA IF NOT EXISTS {folder.split('_')[-1]};"))
+
+            if folder == 'tests':
+                folder_path = os.path.join(compiled_dir, 'Snowball_dbt', folder)
+            else:            
+                folder_path = os.path.join(compiled_dir, 'Snowball_dbt', 'models', folder)
+
+            for root, _, files in os.walk(folder_path):
+                for file in sorted(files):
+                    if file.endswith('.sql'):
+                        file_path = os.path.join(root, file)
+                        model_name = os.path.splitext(file)[0]
+                        
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            sql_content = f.read()                    
+                        nb.cells.append(new_markdown_cell(f"##### **{model_name}**"))
+                        nb.cells.append(new_code_cell(
+                            f"%%sql\n"
+                            f"DROP TABLE IF EXISTS {folder.split('_')[-1]}.{model_name};\n"
+                            f"CREATE TABLE {folder.split('_')[-1]}.{model_name} AS\n"
+                            f"{sql_content}"
+                        ))
+            with open(notebook_path, 'w', encoding='utf-8') as f:
+                nbf.write(nb, f)
+            print(f"📓 Generated: {os.path.basename(notebook_path)}") 
+    except Exception as e:
+        print(f"❌ Failed to generate notebooks: {e}")
+        return False
+    return True
 
 def copy_seed_file(seed_path, target_dir):
-    expected_file_name = "column_mapping.csv"
-    actual_file_name = os.path.basename(seed_path)
-
-    if actual_file_name != expected_file_name:
-        print(f"❌ Invalid mapping file name: '{actual_file_name}'. Expected: '{expected_file_name}'")
-        sys.exit(1)
-
+    """
+    Copy the seed file to target directory and ensure it's named column_mapping.csv
+    """
     os.makedirs(target_dir, exist_ok=True)
+    target_file = os.path.join(target_dir, "column_mapping.csv")
 
     try:
-        shutil.copy(seed_path, target_dir)
-        run_dbt(["seed", "--select", "column_mapping"])
+        # Check if source and target are the same file
+        if os.path.abspath(seed_path) == os.path.abspath(target_file):
+            print(f"✅ Source file is already in target location: {os.path.basename(seed_path)}")
+        else:
+            # Copy the file (will overwrite if exists)
+            shutil.copy(seed_path, target_file)
+            print(f"✅ Copied: {os.path.basename(seed_path)} -> {os.path.basename(target_file)}")
+        
+        # Run dbt seed to load the seed file
+        run_dbt_args(["seed", "--select", "column_mapping"])
         print(f"✅ Processed mapping file")
+        return True
+        
     except FileNotFoundError:
-        print("❌ mapping file not found at the specified path.")
-        return
+        print(f"❌ Seed file not found at: {seed_path}")
+        return False
     except Exception as e:
-        print(f"❌ Failed to copy mapping file: {e}")
-        return
-
+        print(f"❌ Failed to copy seed file: {e}")
+        return False
 
 def transform_compiled_sql(sql_file_path):
     """Post-process a compiled SQL file to wrap in stored procedure format."""
@@ -264,7 +287,6 @@ def transform_compiled_sql(sql_file_path):
     except Exception as e:
         print(f"❌ Failed to transform {sql_file_path}: {e}")
 
-
 def process_compiled_sql_files():
     """Walk through compiled models directory and transform all SQL files."""
     for root, _, files in os.walk(compiled_dir):
@@ -272,11 +294,10 @@ def process_compiled_sql_files():
             if file.endswith(".sql"):
                 transform_compiled_sql(os.path.join(root, file))
 
-def sum_test():
-    return("It is working!")
-
-
 def main():
+    # Clean up previous runs
+    cleanup_previous_run()
+
     if not os.path.exists(mapping_file):
         print(f"❌ Mapping file not found at the specified path: {mapping_file}")
         sys.exit(1)
@@ -311,8 +332,17 @@ def main():
             return
         
         try:
+            print("🚀 Running pre-run setup macro...")
+            macro_result = run_pre_run_setup()
+            if not macro_result.success:
+                print("❌ Pre-run setup macro failed")
+                return
+                
             print("🚀 Running dbt models...")
-            # run_dbt()
+            run_result = run_dbt()
+            if not run_result.success:
+                print("❌ dbt run failed")
+                return
             print("✅ dbt run completed successfully!")
         except Exception as e:
             print(f"❌ dbt run failed: {e}")
@@ -320,7 +350,7 @@ def main():
         
         print("🔨 Compiling dbt models...")
         compile_args = build_dbt_compile_args()
-        compile_result = run_dbt(compile_args)
+        compile_result = run_dbt_args(compile_args)
 
         if compile_result.success:
             print("✅ dbt compile completed successfully!")
@@ -342,9 +372,19 @@ def main():
         if not deps_result.success:
             print("❌ dbt deps failed")
             return
+            
         try:
+            print("🚀 Running pre-run setup macro...")
+            macro_result = run_pre_run_setup()
+            if not macro_result.success:
+                print("❌ Pre-run setup macro failed")
+                return
+                
             print("🚀 Running dbt models...")
-            # run_dbt()
+            run_result = run_dbt()
+            if not run_result.success:
+                print("❌ dbt run failed")
+                return
             print("✅ dbt run completed successfully!")
         except Exception as e:
             print(f"❌ dbt run failed: {e}")
@@ -352,7 +392,7 @@ def main():
 
         print("🔨 Compiling dbt models...")        
         compile_args = build_dbt_compile_args()
-        result = run_dbt(compile_args)
+        result = run_dbt_args(compile_args)
 
         if result and result.success:
             print("✨ Applying SQLFluff rules...")
@@ -373,7 +413,6 @@ def main():
 
         else:
             print("❌ dbt compile failed")
-
 
     else:
         print("❌ Invalid choice. Please enter either 1, 2 or 3.")
