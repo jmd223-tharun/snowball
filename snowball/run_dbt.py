@@ -12,7 +12,7 @@ import json
 import zipfile
 import shutil
 import subprocess
-from config import *
+from .config import *
 from git import Repo
 from datetime import datetime
 from dbt.cli.main import dbtRunner
@@ -440,4 +440,5 @@ def main():
         print("❌ Invalid choice. Please enter either 1, 2 or 3.")
 
 if __name__ == "__main__":
+
     main()
