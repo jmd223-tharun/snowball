@@ -314,7 +314,7 @@ def clone_repo(git_url: str) -> str:
         print(f"Cloning into {clone_path} ...")
         Repo.clone_from(git_url, clone_path)
         print("Clone completed.")
-    return(os.path.join(clone_path, 'snowball_dbt', 'seeds', 'column_mapping.csv'))
+    return(os.path.join(clone_path, 'seeds', 'column_mapping.csv'))
 
 def copy_csv_to_downloads(src_csv_path: str) -> str:
     """
