@@ -345,7 +345,7 @@ def copy_csv_to_downloads(src_csv_path: str) -> str:
 def main():
     # Clone the latest repo from Snowball dbt
     mapping_file_path = clone_repo("https://github.com/jmangroup/snowball_dbt.git")
-
+    print(mapping_file_path)
     copy_csv_to_downloads(mapping_file_path)
 
     # Clean up previous runs
