@@ -12,7 +12,7 @@ import json
 import zipfile
 import shutil
 import subprocess
-from config import *
+from .config import *
 from git import Repo
 from datetime import datetime
 from dbt.cli.main import dbtRunner
