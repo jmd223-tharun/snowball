@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: snowball
-Version: 1.0.10
+Version: 1.0.11
 Summary: Generate compiled dbt projects and PySpark notebooks.
 Home-page: https://gitserver/org/dbt_runner
 Author: Vishal Verma
@@ -11,6 +11,7 @@ Classifier: Operating System :: OS Independent
 Requires-Python: >=3.7
 Description-Content-Type: text/markdown
 License-File: LICENSE
+Requires-Dist: GitPython>=3.1.0
 Requires-Dist: dbt-core
 Requires-Dist: sqlfluff
 Requires-Dist: nbformat

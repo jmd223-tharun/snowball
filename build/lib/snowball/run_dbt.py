@@ -12,7 +12,8 @@ import json
 import zipfile
 import shutil
 import subprocess
-from .config import *
+from config import *
+from git import Repo
 from datetime import datetime
 from dbt.cli.main import dbtRunner
 import nbformat as nbf
@@ -294,7 +295,28 @@ def process_compiled_sql_files():
             if file.endswith(".sql"):
                 transform_compiled_sql(os.path.join(root, file))
 
+def clone_repo(git_url: str) -> str:
+    """
+    Clone the Git repository from `git_url` into the current directory.
+    
+    Args:
+        git_url (str): URL of the git repository to clone.
+        
+    """
+    repo_name = os.path.splitext(os.path.basename(git_url))[0]
+    clone_path = os.path.join(os.getcwd(), repo_name)
+    
+    # If folder exists, skip cloning to avoid overwriting
+    if os.path.exists(clone_path):
+        print(f"Repository already cloned at {clone_path}")
+    else:
+        print(f"Cloning into {clone_path} ...")
+        Repo.clone_from(git_url, clone_path)
+        print("Clone completed.")
+
 def main():
+    # Clone the latest repo from Snowball dbt
+    clone_repo("https://github.com/jmangroup/snowball_dbt.git")
     # Clean up previous runs
     cleanup_previous_run()
 

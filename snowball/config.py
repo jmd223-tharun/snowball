@@ -6,12 +6,13 @@ config.py
     and other parameters that are reused across the project.
 
 """
+from pathlib import Path
 
 # === Project paths === #
-profiles_dir = r"C:\Users\KonduruTharun\.dbt"
+profiles_dir = str(Path.home() / ".dbt")
 project_dir  = r"C:\Users\KonduruTharun\Downloads\snowball_project\snowball_dbt"
 mapping_file = r"C:\Users\KonduruTharun\Downloads\column_mapping.csv"
-output_dir   = r"C:\Users\KonduruTharun\Downloads"
+output_dir = str(Path.home() / "Downloads")
 
 # === Database configuration === #
 db_vars = {
