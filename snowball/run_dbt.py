@@ -14,6 +14,7 @@ import shutil
 import subprocess
 from .config import *
 from git import Repo
+from pathlib import Path
 from datetime import datetime
 from dbt.cli.main import dbtRunner
 import nbformat as nbf
@@ -313,10 +314,40 @@ def clone_repo(git_url: str) -> str:
         print(f"Cloning into {clone_path} ...")
         Repo.clone_from(git_url, clone_path)
         print("Clone completed.")
+    return(os.path.join(clone_path, 'snowball_dbt', 'seeds', 'column_mapping.csv'))
+
+def copy_csv_to_downloads(src_csv_path: str) -> str:
+    """
+    Copy a CSV file from src_csv_path to the Downloads folder of the current user.
+    
+    Args:
+        src_csv_path (str): The source path of the CSV file to copy.
+        
+    Returns:
+        str: The full path to the copied file in the Downloads folder.
+    """
+    # Get the user's Downloads folder path dynamically
+    downloads_dir = Path.home() / "Downloads"
+    
+    # Ensure Downloads folder exists (usually it does)
+    downloads_dir.mkdir(parents=True, exist_ok=True)
+    
+    src_path = Path(src_csv_path)
+    if not src_path.is_file():
+        raise FileNotFoundError(f"Source CSV file not found: {src_csv_path}")
+    
+    # Destination path keeps the same filename
+    dest_path = downloads_dir / src_path.name
+    
+    # Copy file
+    shutil.copy2(src_path, dest_path)
 
 def main():
     # Clone the latest repo from Snowball dbt
-    clone_repo("https://github.com/jmangroup/snowball_dbt.git")
+    mapping_file_path = clone_repo("https://github.com/jmangroup/snowball_dbt.git")
+
+    copy_csv_to_downloads(mapping_file_path)
+
     # Clean up previous runs
     cleanup_previous_run()
 
@@ -325,7 +356,7 @@ def main():
         sys.exit(1)
 
     copy_seed_file(mapping_file, dbt_seed_dir)
-
+    print(f"\nColumn mapping file has been downloaded to {Path.home()}/Downloads/column_mapping.csv, Please update it & add profiles.yml file and continue...")
     print("\nWhat would you like to do?")
     print("1: Package the full dbt project")
     print("2: Compile the SQL project code")

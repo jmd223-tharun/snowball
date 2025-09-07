@@ -10,7 +10,7 @@ from pathlib import Path
 
 # === Project paths === #
 profiles_dir = str(Path.home() / ".dbt")
-project_dir  = r"C:\Users\KonduruTharun\Downloads\snowball_project\snowball_dbt"
+project_dir  = str(Path.home() / "Downloads")
 mapping_file = r"C:\Users\KonduruTharun\Downloads\column_mapping.csv"
 output_dir = str(Path.home() / "Downloads")
 
