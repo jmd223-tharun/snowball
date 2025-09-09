@@ -10,8 +10,8 @@ from pathlib import Path
 
 # === Project paths === #
 profiles_dir = str(Path.home() / ".dbt")
-project_dir  = str(Path.home() / "Downloads")
-mapping_file = r"C:\Users\KonduruTharun\Downloads\column_mapping.csv"
+project_dir  = str(Path.home() / "Downloads/snowball_dbt")
+mapping_file = str(Path.home() / "Downloads/column_mapping.csv")
 output_dir = str(Path.home() / "Downloads")
 
 # === Database configuration === #
