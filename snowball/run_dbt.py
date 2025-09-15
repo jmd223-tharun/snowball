@@ -398,134 +398,88 @@ def copy_csv_to_downloads(src_csv_path: str) -> str:
     # Copy file
     shutil.copy2(src_path, dest_path)
 
-def main():
-    # Clone the latest repo from Snowball dbt
-    mapping_file_path = clone_repo("https://github.com/jmangroup/snowball_dbt.git")
-    print(mapping_file_path)
-    copy_csv_to_downloads(mapping_file_path)
 
-    # Clean up previous runs
+def main():
+    # Clone repo and copy mapping file
+    mapping_file_path = clone_repo("https://github.com/jmangroup/snowball_dbt.git")
+    copy_seed_file(mapping_file_path, dbt_seed_dir)
+    print(f"\nColumn mapping file copied to {Path.home()}/Downloads/column_mapping.csv. "
+          "Please update it & add profiles.yml file before proceeding.")
+
+    # Clean previous runs
     cleanup_previous_run()
 
-    if not os.path.exists(mapping_file):
-        print(f"❌ Mapping file not found at the specified path: {mapping_file}")
-        sys.exit(1)
+    # --- DBT steps with retry until success ---
+    while True:
+        print("📦 Installing dbt dependencies...")
+        deps_result = run_dbt_deps()
+        if not deps_result.success:
+            print("❌ dbt deps failed. Check profiles.yml / environment.")
+            input("Press Enter to retry after fixing credentials...")
+            continue
+        print("✅ dbt deps completed successfully!")
 
-    copy_seed_file(mapping_file, dbt_seed_dir)
-    print(f"\nColumn mapping file has been downloaded to {Path.home()}/Downloads/column_mapping.csv, Please update it & add profiles.yml file and continue...")
-    print("\nWhat would you like to do?")
-    print("1: Package the full dbt project")
-    print("2: Compile the SQL project code")
-    print("3: Get the pyspark notebooks for compiled SQL")
+        print("🚀 Running pre-run setup macro...")
+        macro_result = run_pre_run_setup()
+        if not macro_result.success:
+            print("❌ Pre-run macro failed. Check profiles.yml / credentials.")
+            input("Press Enter your correct credentials to retry...")
+            continue
+        print("✅ Pre-run setup macro completed successfully!")
 
-    try:
-        user_choice = int(input("Enter your choice (1, 2 or 3): ").strip())
-    except ValueError:
-        print("❌ Invalid input. Please enter 1, 2 or 3.")
-        return
+        print("🚀 Running dbt models...")
+        run_result = run_dbt()
+        if not run_result.success:
+            print("❌ dbt run failed. Check your credentials.")
+            input("Press Enter to retry...")
+            continue
+        print("✅ dbt run completed successfully!")
+        break  # Exit the retry loop
 
-    if user_choice == 1:
+    # --- Menu appears only after successful DBT ---
+    while True:
+        print("\nWhat would you like to do?")
+        print("1: Package the full dbt project")
+        print("2: Compile the SQL project code")
+        print("3: Get the pyspark notebooks for compiled SQL")
+
         try:
-            print("📦 Packaging the full dbt project...")
+            user_choice = int(input("Enter your choice (1, 2 or 3): ").strip())
+        except ValueError:
+            print("❌ Invalid input. Please enter 1, 2 or 3.")
+            continue
+
+        if user_choice == 1:
             zip_directory(project_dir, output_zip)
-            print("\n✅ Your full dbt project has been packaged successfully!")
-            print(f"📦 Zipped dbt project saved at: {output_zip}")
-        except Exception as e:
-            print(f"❌ Failed to zip dbt project: {e}")
+            print(f"✅ Full dbt project zipped at: {output_zip}")
 
-    elif user_choice == 2:
-        print("📦 Installing dbt dependencies...")
-        deps_result = run_dbt_deps()
-        if not deps_result.success:
-            print("❌ dbt deps failed")
-            return
-        
-        try:
-            
-            print("🚀 Running pre-run setup macro...")
-            macro_result = run_pre_run_setup()
-            if not macro_result.success:
-                print("❌ Pre-run setup macro failed")
-                return
-                
-            print("🚀 Running dbt models...")
-            run_result = run_dbt()
-            if not run_result.success:
-                print("❌ dbt run failed")
-                return
-            print("✅ dbt run completed successfully!")
-        except Exception as e:
-            print(f"❌ dbt run failed: {e}")
-            return
-        
-        print("🔨 Compiling dbt models...")
-        compile_args = build_dbt_compile_args()
-        compile_result = run_dbt_args(compile_args)
-
-        if compile_result.success:
-            print("✅ dbt compile completed successfully!")
-            print("✨ Applying SQLFluff rules...")
-            sqlfluff_success = apply_sqlfluff_to_compiled()
-            if sqlfluff_success:
-                print("📊 SQLFluff formatting completed successfully!")
+        elif user_choice == 2:
+            compile_args = build_dbt_compile_args()
+            compile_result = run_dbt_args(compile_args)
+            if compile_result.success:
+                apply_sqlfluff_to_compiled()
+                process_compiled_sql_files()
+                zip_directory(compiled_dir, output_zip)
+                print(f"✅ Compiled & formatted SQL files zipped at: {output_zip}")
             else:
-                print("⚠️ SQLFluff encountered some issues, but continuing with processing...")
-            process_compiled_sql_files()
-            zip_directory(compiled_dir, output_zip)
-            print(f"📦 Compiled & formatted SQL files zipped at: {output_zip}")
-        else:
-            print("❌ dbt compile failed")
+                print("❌ dbt compile failed")
 
-    elif user_choice == 3:
-        print("📦 Installing dbt dependencies...")
-        deps_result = run_dbt_deps()
-        if not deps_result.success:
-            print("❌ dbt deps failed")
-            return
-            
-        try:
-            print("🚀 Running pre-run setup macro...")
-            macro_result = run_pre_run_setup()
-            if not macro_result.success:
-                print("❌ Pre-run setup macro failed")
-                return
-                
-            print("🚀 Running dbt models...")
-            run_result = run_dbt()
-            if not run_result.success:
-                print("❌ dbt run failed")
-                return
-            print("✅ dbt run completed successfully!")
-        except Exception as e:
-            print(f"❌ dbt run failed: {e}")
-            return
-
-        print("🔨 Compiling dbt models...")        
-        compile_args = build_dbt_compile_args()
-        result = run_dbt_args(compile_args)
-
-        if result and result.success:
-            print("✨ Applying SQLFluff rules...")
-            sqlfluff_success = apply_sqlfluff_to_compiled()
-            if sqlfluff_success:
-                print("📊 SQLFluff formatting completed successfully!")
+        elif user_choice == 3:
+            compile_args = build_dbt_compile_args()
+            compile_result = run_dbt_args(compile_args)
+            if compile_result.success:
+                apply_sqlfluff_to_compiled()
+                generate_notebooks()
+                zip_directory(notebooks_dir, output_zip)
+                print(f"✅ Notebooks zipped at: {output_zip}")
             else:
-                print("⚠️ SQLFluff encountered some issues, but continuing with processing...")
-
-            print("\n🔨 Generating PySpark notebooks...")
-            generate_notebooks()
-            print(f"\n📓 Notebooks saved to: {notebooks_dir}")
-
-            if os.path.exists(output_zip):
-                os.remove(output_zip)
-            zip_directory(notebooks_dir, output_zip)
-            print(f"📦 Notebooks zipped at: {output_zip}")
+                print("❌ dbt compile failed")
 
         else:
-            print("❌ dbt compile failed")
+            print("❌ Invalid choice. Please enter 1, 2 or 3.")
 
-    else:
-        print("❌ Invalid choice. Please enter either 1, 2 or 3.")
+
+
 
 if __name__ == "__main__":
     main()
