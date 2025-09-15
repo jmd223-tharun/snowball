@@ -12,7 +12,7 @@ import json
 import zipfile
 import shutil
 import subprocess
-from .config import *
+from config import *
 from git import Repo
 from pathlib import Path
 from datetime import datetime
@@ -22,14 +22,16 @@ from nbformat.v4 import new_notebook, new_markdown_cell, new_code_cell
 
 # === Set OS path & environment variables === #
 os.environ["DBT_PROFILES_DIR"] = profiles_dir
+project_root = project_dir
+os.chdir(project_root)
 
+project_dir  = os.path.join(project_dir, "snowball_dbt")
+print('printing project directory')
+print(project_dir)
 compiled_dir  = os.path.join(project_dir, "target", "compiled")
 output_zip    = os.path.join(output_dir, "compiled_models.zip")
 dbt_seed_dir  = os.path.join(project_dir, "seeds")
 notebooks_dir = os.path.join(output_dir, "notebooks")
-
-project_root = project_dir
-os.chdir(project_root)
 
 def cleanup_previous_run():
     """Clean up previous compiled files and notebooks"""
@@ -40,47 +42,93 @@ def cleanup_previous_run():
 
 def run_dbt_deps():
     """Run dbt deps to install dependencies"""
+    vars_dict = {
+        'my_database': 'arr_sandbox',
+        'my_schema': 'dbo',
+        'my_table': 'sample_arr_dataset'
+    }
+    vars_str = json.dumps(vars_dict)
     deps_args = [
         "deps",
         "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir
+        "--profiles-dir", profiles_dir,
+        "--vars", vars_str
     ]
     dbt = dbtRunner()
     return dbt.invoke(deps_args)
 
 def run_dbt():
     """Run all dbt models"""
+    vars_dict = {
+        'my_database': 'arr_sandbox',
+        'my_schema': 'dbo',
+        'my_table': 'sample_arr_dataset'
+    }
+    vars_str = json.dumps(vars_dict)
+    print(vars_str)
     run_args = [
         "run",
         "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir
+        "--profiles-dir", profiles_dir,
+        "--vars", vars_str
     ]
     dbt = dbtRunner()
     return dbt.invoke(run_args)
 
 def run_pre_run_setup():
     """Run the pre_run_setup macro"""
+    args_dict = {
+        'db_name': 'arr_sandbox',
+        'schema_name': 'dbo',
+        'table_name': 'sample_arr_dataset'
+    }
+    vars_dict = {
+        'my_database': 'arr_sandbox',
+        'my_schema': 'dbo',
+        'my_table': 'sample_arr_dataset'
+    }
+    vars_str = json.dumps(vars_dict)
+    args_str = json.dumps(args_dict)
+    print(args_str)
     macro_args = [
         "run-operation",
         "pre_run_setup",
         "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir
+        "--profiles-dir", profiles_dir,
+        "--args", args_str,
+        "--vars", vars_str
     ]
     dbt = dbtRunner()
     return dbt.invoke(macro_args)
 
 def build_dbt_compile_args():
     """Build arguments for dbt compile"""
+    vars_dict = {
+        'my_database': 'arr_sandbox',
+        'my_schema': 'dbo',
+        'my_table': 'sample_arr_dataset'
+    }
+    vars_str = json.dumps(vars_dict)
     return [
         "compile",
         "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir
+        "--profiles-dir", profiles_dir,
+        "--vars", vars_str
     ]
 
 def run_dbt_args(cli_args):
-    """Run dbt with given arguments"""
+    """Run dbt with given arguments, optionally passing vars."""
+    vars_dict = {
+        'my_database': 'arr_sandbox',
+        'my_schema': 'dbo',
+        'my_table': 'sample_arr_dataset'
+    }
+    vars_str = json.dumps(vars_dict)
+    cli_args += ["--vars", vars_str]
+
     dbt = dbtRunner()
     return dbt.invoke(cli_args)
+
 
 def zip_directory(source_dir, zip_path):
     """Zip the contents of an entire directory"""
@@ -305,16 +353,24 @@ def clone_repo(git_url: str) -> str:
         
     """
     repo_name = os.path.splitext(os.path.basename(git_url))[0]
-    clone_path = os.path.join(os.getcwd(), repo_name)
+    print('printing current working directory')
+    print(os.getcwd())
+
+    clone_location = os.path.join(os.getcwd(),repo_name)
+    print(clone_location)
+    clone_path = os.path.join(os.getcwd(),repo_name)
     
     # If folder exists, skip cloning to avoid overwriting
-    if os.path.exists(clone_path):
-        print(f"Repository already cloned at {clone_path}")
+    if os.path.exists(clone_location):
+        print(f"Repository already cloned at {clone_location}")
     else:
-        print(f"Cloning into {clone_path} ...")
-        Repo.clone_from(git_url, clone_path)
+        print(f"Cloning into {clone_location} ...")
+        Repo.clone_from(git_url, clone_location)
         print("Clone completed.")
-    return(os.path.join(clone_path, 'seeds', 'column_mapping.csv'))
+    os.chdir(clone_path)
+    print('after changing')
+    print(os.getcwd())
+    return(os.path.join(clone_location, 'seeds', 'column_mapping.csv'))
 
 def copy_csv_to_downloads(src_csv_path: str) -> str:
     """
@@ -385,6 +441,7 @@ def main():
             return
         
         try:
+            
             print("🚀 Running pre-run setup macro...")
             macro_result = run_pre_run_setup()
             if not macro_result.success:
