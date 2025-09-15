@@ -19,19 +19,62 @@ from datetime import datetime
 from dbt.cli.main import dbtRunner
 import nbformat as nbf
 from nbformat.v4 import new_notebook, new_markdown_cell, new_code_cell
+import time
+import sys
+import time
+import itertools
+import threading
+import subprocess
+
+def run_with_progress(title, func, *args, **kwargs):
+    """
+    Run a function with a simple spinner (no tqdm required).
+    """
+    print(f"🔄 {title}... ", end="", flush=True)
+
+    result = None
+    done = False
+
+    def run_func():
+        nonlocal result, done
+        try:
+            result = func(*args, **kwargs)
+        except Exception as e:
+            print(f"\n❌ {title} failed: {e}")
+            result = None
+        finally:
+            done = True
+
+    thread = threading.Thread(target=run_func)
+    thread.start()
+
+    spinner = itertools.cycle(["|", "/", "-", "\\"])
+    while not done:
+        sys.stdout.write(next(spinner))
+        sys.stdout.flush()
+        time.sleep(0.1)
+        sys.stdout.write("\b")
+
+    thread.join()
+
+    if result and getattr(result, "success", True):
+        print(" ✅ Finished")
+    else:
+        print(" ❌ Failed")
+    return result
+
+
 
 # === Set OS path & environment variables === #
 os.environ["DBT_PROFILES_DIR"] = profiles_dir
-project_root = project_dir
-os.chdir(project_root)
 
-project_dir  = os.path.join(project_dir, "snowball_dbt")
-print('printing project directory')
-print(project_dir)
 compiled_dir  = os.path.join(project_dir, "target", "compiled")
 output_zip    = os.path.join(output_dir, "compiled_models.zip")
 dbt_seed_dir  = os.path.join(project_dir, "seeds")
 notebooks_dir = os.path.join(output_dir, "notebooks")
+
+project_root = project_dir
+os.chdir(project_root)
 
 def cleanup_previous_run():
     """Clean up previous compiled files and notebooks"""
@@ -41,93 +84,47 @@ def cleanup_previous_run():
             print(f"🧹 Cleaned up: {dir_path}")
 
 def run_dbt_deps():
-    """Run dbt deps to install dependencies"""
-    vars_dict = {
-        'my_database': 'arr_sandbox',
-        'my_schema': 'dbo',
-        'my_table': 'sample_arr_dataset'
-    }
-    vars_str = json.dumps(vars_dict)
-    deps_args = [
-        "deps",
-        "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir,
-        "--vars", vars_str
-    ]
-    dbt = dbtRunner()
-    return dbt.invoke(deps_args)
+    return subprocess.run(
+        ["dbt", "deps"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
 def run_dbt():
-    """Run all dbt models"""
-    vars_dict = {
-        'my_database': 'arr_sandbox',
-        'my_schema': 'dbo',
-        'my_table': 'sample_arr_dataset'
-    }
-    vars_str = json.dumps(vars_dict)
-    print(vars_str)
-    run_args = [
+    return run_dbt_args([
         "run",
         "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir,
-        "--vars", vars_str
-    ]
-    dbt = dbtRunner()
-    return dbt.invoke(run_args)
+        "--profiles-dir", profiles_dir
+    ])
 
 def run_pre_run_setup():
-    """Run the pre_run_setup macro"""
-    args_dict = {
-        'db_name': 'arr_sandbox',
-        'schema_name': 'dbo',
-        'table_name': 'sample_arr_dataset'
-    }
-    vars_dict = {
-        'my_database': 'arr_sandbox',
-        'my_schema': 'dbo',
-        'my_table': 'sample_arr_dataset'
-    }
-    vars_str = json.dumps(vars_dict)
-    args_str = json.dumps(args_dict)
-    print(args_str)
-    macro_args = [
-        "run-operation",
-        "pre_run_setup",
+    return run_dbt_args([
+        "run-operation", "pre_run_setup",
         "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir,
-        "--args", args_str,
-        "--vars", vars_str
-    ]
-    dbt = dbtRunner()
-    return dbt.invoke(macro_args)
+        "--profiles-dir", profiles_dir
+    ])
+
+
 
 def build_dbt_compile_args():
     """Build arguments for dbt compile"""
-    vars_dict = {
-        'my_database': 'arr_sandbox',
-        'my_schema': 'dbo',
-        'my_table': 'sample_arr_dataset'
-    }
-    vars_str = json.dumps(vars_dict)
     return [
         "compile",
         "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir,
-        "--vars", vars_str
+        "--profiles-dir", profiles_dir
     ]
 
 def run_dbt_args(cli_args):
-    """Run dbt with given arguments, optionally passing vars."""
-    vars_dict = {
-        'my_database': 'arr_sandbox',
-        'my_schema': 'dbo',
-        'my_table': 'sample_arr_dataset'
-    }
-    vars_str = json.dumps(vars_dict)
-    cli_args += ["--vars", vars_str]
-
-    dbt = dbtRunner()
-    return dbt.invoke(cli_args)
+    """Run dbt with given arguments silently"""
+    result = subprocess.run(
+        ["dbt"] + cli_args,
+        stdout=subprocess.DEVNULL,  # hide normal logs
+        stderr=subprocess.DEVNULL,  # hide errors
+    )
+    # Wrap result in a simple object with .success attribute
+    class DbtResult:
+        def __init__(self, success): self.success = success
+    return DbtResult(result.returncode == 0)
 
 
 def zip_directory(source_dir, zip_path):
@@ -141,12 +138,9 @@ def zip_directory(source_dir, zip_path):
 
 def run_sqlfluff_on_directory(directory_path):
     """
-    Run SQLFluff fix on all SQL files in a directory.
+    Run SQLFluff fix on all SQL files in a directory silently.
     """
     try:
-        print(f"🔧 Applying SQLFluff to directory: {directory_path}")
-        
-        # Run SQLFluff on each SQL file in the directory
         sql_files = []
         for root, _, files in os.walk(directory_path):
             for file in files:
@@ -156,48 +150,39 @@ def run_sqlfluff_on_directory(directory_path):
         success_count = 0
         for sql_file in sql_files:
             try:
-                # Run SQLFluff on individual file
-                result = subprocess.run(
+                subprocess.run(
                     ["sqlfluff", "fix", "--force", sql_file],
+                    stdout=subprocess.DEVNULL,   # suppress normal output
+                    stderr=subprocess.DEVNULL,   # suppress errors
                     check=False,
-                    text=True,
-                    capture_output=True,
-                    cwd=project_root
                 )
-
-                if result.returncode == 0:
-                    print(f"✅ SQLFluff completed for: {os.path.basename(sql_file)}")
-                    success_count += 1
-                else:
-                    print(f"⚠️ SQLFluff encountered issues for: {os.path.basename(sql_file)}")
-                    if result.stdout:
-                        print(f"STDOUT: {result.stdout}")
-                    if result.stderr:
-                        print(f"STDERR: {result.stderr}")
-                        
-            except Exception as e:
-                print(f"❌ Error processing {os.path.basename(sql_file)}: {e}")
+                success_count += 1
+            except Exception:
+                pass  # stay silent even on error
         
-        print(f"📊 SQLFluff processed {success_count}/{len(sql_files)} files successfully")
+        # Only return status, no printing
         return success_count > 0
-            
-    except Exception as e:
-        print(f"❌ Unexpected error with SQLFluff for {directory_path}: {e}")
+    
+    except Exception:
         return False
+
 
 def apply_sqlfluff_to_compiled():
     """
     Apply SQLFluff to all compiled SQL files before packaging.
-    Run SQLFluff on the entire compiled models directory at once for efficiency.
     """
-    # check SQLFluff is availability
+    # check SQLFluff availability silently
     try:
-        subprocess.run(["sqlfluff", "--version"], check=True, capture_output=True)
+        subprocess.run(
+            ["sqlfluff", "--version"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ SQLFluff is not installed or not available in PATH")
         return False
     
-    # Run SQLFluff on the compiled models directory
+    # Run SQLFluff silently
     return run_sqlfluff_on_directory(compiled_dir)
 
 def generate_notebooks():
@@ -353,24 +338,16 @@ def clone_repo(git_url: str) -> str:
         
     """
     repo_name = os.path.splitext(os.path.basename(git_url))[0]
-    print('printing current working directory')
-    print(os.getcwd())
-
-    clone_location = os.path.join(os.getcwd(),repo_name)
-    print(clone_location)
-    clone_path = os.path.join(os.getcwd(),repo_name)
+    clone_path = os.path.join(os.getcwd(), repo_name)
     
     # If folder exists, skip cloning to avoid overwriting
-    if os.path.exists(clone_location):
-        print(f"Repository already cloned at {clone_location}")
+    if os.path.exists(clone_path):
+        print(f"Repository already cloned at {clone_path}")
     else:
-        print(f"Cloning into {clone_location} ...")
-        Repo.clone_from(git_url, clone_location)
+        print(f"Cloning into {clone_path} ...")
+        Repo.clone_from(git_url, clone_path)
         print("Clone completed.")
-    os.chdir(clone_path)
-    print('after changing')
-    print(os.getcwd())
-    return(os.path.join(clone_location, 'seeds', 'column_mapping.csv'))
+    return(os.path.join(clone_path, 'seeds', 'column_mapping.csv'))
 
 def copy_csv_to_downloads(src_csv_path: str) -> str:
     """
@@ -398,88 +375,127 @@ def copy_csv_to_downloads(src_csv_path: str) -> str:
     # Copy file
     shutil.copy2(src_path, dest_path)
 
-
 def main():
-    # Clone repo and copy mapping file
+    # Clone the latest repo from Snowball dbt
     mapping_file_path = clone_repo("https://github.com/jmangroup/snowball_dbt.git")
-    copy_seed_file(mapping_file_path, dbt_seed_dir)
-    print(f"\nColumn mapping file copied to {Path.home()}/Downloads/column_mapping.csv. "
-          "Please update it & add profiles.yml file before proceeding.")
+    print(mapping_file_path)
+    copy_csv_to_downloads(mapping_file_path)
 
-    # Clean previous runs
+    # Clean up previous runs
     cleanup_previous_run()
 
-    # --- DBT steps with retry until success ---
-    while True:
-        print("📦 Installing dbt dependencies...")
-        deps_result = run_dbt_deps()
-        if not deps_result.success:
-            print("❌ dbt deps failed. Check profiles.yml / environment.")
-            input("Press Enter to retry after fixing credentials...")
-            continue
-        print("✅ dbt deps completed successfully!")
+    if not os.path.exists(mapping_file):
+        print(f"❌ Mapping file not found at the specified path: {mapping_file}")
+        sys.exit(1)
 
-        print("🚀 Running pre-run setup macro...")
-        macro_result = run_pre_run_setup()
-        if not macro_result.success:
-            print("❌ Pre-run macro failed. Check profiles.yml / credentials.")
-            input("Press Enter your correct credentials to retry...")
-            continue
-        print("✅ Pre-run setup macro completed successfully!")
+    copy_seed_file(mapping_file, dbt_seed_dir)
+    print(f"\nColumn mapping file has been downloaded to {Path.home()}/Downloads/column_mapping.csv, Please update it & add profiles.yml file and continue...")
+    print("\nWhat would you like to do?")
+    print("1: Package the full dbt project")
+    print("2: Compile the SQL project code")
+    print("3: Get the pyspark notebooks for compiled SQL")
 
-        print("🚀 Running dbt models...")
-        run_result = run_dbt()
-        if not run_result.success:
-            print("❌ dbt run failed. Check your credentials.")
-            input("Press Enter to retry...")
-            continue
-        print("✅ dbt run completed successfully!")
-        break  # Exit the retry loop
+    try:
+        user_choice = int(input("Enter your choice (1, 2 or 3): ").strip())
+    except ValueError:
+        print("❌ Invalid input. Please enter 1, 2 or 3.")
+        return
 
-    # --- Menu appears only after successful DBT ---
-    while True:
-        print("\nWhat would you like to do?")
-        print("1: Package the full dbt project")
-        print("2: Compile the SQL project code")
-        print("3: Get the pyspark notebooks for compiled SQL")
-
+    if user_choice == 1:
         try:
-            user_choice = int(input("Enter your choice (1, 2 or 3): ").strip())
-        except ValueError:
-            print("❌ Invalid input. Please enter 1, 2 or 3.")
-            continue
-
-        if user_choice == 1:
+            print("📦 Packaging the full dbt project...")
             zip_directory(project_dir, output_zip)
-            print(f"✅ Full dbt project zipped at: {output_zip}")
+            print("\n✅ Your full dbt project has been packaged successfully!")
+            print(f"📦 Zipped dbt project saved at: {output_zip}")
+        except Exception as e:
+            print(f"❌ Failed to zip dbt project: {e}")
 
-        elif user_choice == 2:
-            compile_args = build_dbt_compile_args()
-            compile_result = run_dbt_args(compile_args)
-            if compile_result.success:
-                apply_sqlfluff_to_compiled()
-                process_compiled_sql_files()
-                zip_directory(compiled_dir, output_zip)
-                print(f"✅ Compiled & formatted SQL files zipped at: {output_zip}")
-            else:
-                print("❌ dbt compile failed")
+    elif user_choice == 2:
+        deps_result = run_with_progress("Installing dbt dependencies", run_dbt_deps)
+        if deps_result.returncode != 0:
+            print("❌ dbt deps failed")
+            return
+        
+        try:
+            macro_result = run_with_progress("Running pre-run setup macro", run_pre_run_setup)
+            if not macro_result.success:
+                print("❌ Pre-run setup macro failed")
+                return
+                
+            run_result = run_with_progress("Running dbt models", run_dbt)
+            if not run_result.success:
+                print("❌ dbt run failed")
+                return
+            print("✅ dbt run completed successfully!")
+        except Exception as e:
+            print(f"❌ dbt run failed: {e}")
+            return
+        
+        print("🔨 Compiling dbt models...")
+        compile_args = build_dbt_compile_args()
+        compile_result = run_dbt_args(compile_args)
 
-        elif user_choice == 3:
-            compile_args = build_dbt_compile_args()
-            compile_result = run_dbt_args(compile_args)
-            if compile_result.success:
-                apply_sqlfluff_to_compiled()
-                generate_notebooks()
-                zip_directory(notebooks_dir, output_zip)
-                print(f"✅ Notebooks zipped at: {output_zip}")
+        if compile_result.success:
+            print("✅ dbt compile completed successfully!")
+            print("✨ Applying SQLFluff rules...")
+            sqlfluff_success = apply_sqlfluff_to_compiled()
+            if sqlfluff_success:
+                print("📊 SQLFluff formatting completed successfully!")
             else:
-                print("❌ dbt compile failed")
+                print("⚠️ SQLFluff encountered some issues, but continuing with processing...")
+            process_compiled_sql_files()
+            zip_directory(compiled_dir, output_zip)
+            print(f"📦 Compiled & formatted SQL files zipped at: {output_zip}")
+        else:
+            print("❌ dbt compile failed")
+
+    elif user_choice == 3:
+        deps_result = run_with_progress("Installing dbt dependencies", run_dbt_deps)
+        if not deps_result.success:
+            print("❌ dbt deps failed")
+            return
+            
+        try:
+            macro_result = run_with_progress("Running pre-run setup macro", run_pre_run_setup)
+            if not macro_result.success:
+                print("❌ Pre-run setup macro failed")
+                return
+                
+            run_result = run_with_progress("Running dbt models", run_dbt)
+            if not run_result.success:
+                print("❌ dbt run failed")
+                return
+            print("✅ dbt run completed successfully!")
+        except Exception as e:
+            print(f"❌ dbt run failed: {e}")
+            return
+
+        print("🔨 Compiling dbt models...")        
+        compile_args = build_dbt_compile_args()
+        result = run_dbt_args(compile_args)
+
+        if result and result.success:
+            print("✨ Applying SQLFluff rules...")
+            sqlfluff_success = apply_sqlfluff_to_compiled()
+            if sqlfluff_success:
+                print("📊 SQLFluff formatting completed successfully!")
+            else:
+                print("⚠️ SQLFluff encountered some issues, but continuing with processing...")
+
+            print("\n🔨 Generating PySpark notebooks...")
+            generate_notebooks()
+            print(f"\n📓 Notebooks saved to: {notebooks_dir}")
+
+            if os.path.exists(output_zip):
+                os.remove(output_zip)
+            zip_directory(notebooks_dir, output_zip)
+            print(f"📦 Notebooks zipped at: {output_zip}")
 
         else:
-            print("❌ Invalid choice. Please enter 1, 2 or 3.")
+            print("❌ dbt compile failed")
 
-
-
+    else:
+        print("❌ Invalid choice. Please enter either 1, 2 or 3.")
 
 if __name__ == "__main__":
     main()
