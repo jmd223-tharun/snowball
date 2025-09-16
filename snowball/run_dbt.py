@@ -12,129 +12,379 @@ import json
 import zipfile
 import shutil
 import subprocess
-from .config import *
+import time
+from config import *
 from git import Repo
 from pathlib import Path
 from datetime import datetime
 from dbt.cli.main import dbtRunner
 import nbformat as nbf
 from nbformat.v4 import new_notebook, new_markdown_cell, new_code_cell
+from tqdm import tqdm
+import threading
+from contextlib import redirect_stdout, redirect_stderr
+from io import StringIO
 
 # === Set OS path & environment variables === #
 os.environ["DBT_PROFILES_DIR"] = profiles_dir
+project_root = project_dir
+os.chdir(project_root)
 
+project_dir  = os.path.join(project_dir, "snowball_dbt")
 compiled_dir  = os.path.join(project_dir, "target", "compiled")
 output_zip    = os.path.join(output_dir, "compiled_models.zip")
 dbt_seed_dir  = os.path.join(project_dir, "seeds")
 notebooks_dir = os.path.join(output_dir, "notebooks")
 
-project_root = project_dir
-os.chdir(project_root)
+def welcome_message():
+    message = "Welcome to Snowball Product!"
+    width = len(message) + 8  # padding for stars
+    border = "*" * width
+
+    # Prepare the lines to print
+    line1 = border
+    line2 = "*" + message.center(width - 2) + "*"
+    line3 = border
+
+    # Get terminal width
+    term_width = shutil.get_terminal_size().columns
+
+    # Center the output lines relative to terminal width
+    print(line1.center(term_width))
+    print(line2.center(term_width))
+    print(line3.center(term_width))
+
+def show_progress(desc, duration=None, steps=None):
+    """Show a progress bar for a given operation"""
+    if duration:
+        # Time-based progress bar
+        with tqdm(total=100, desc=desc, bar_format='{desc}: {percentage:3.0f}%|{bar}| {elapsed}') as pbar:
+            step_time = duration / 100
+            for i in range(100):
+                time.sleep(step_time)
+                pbar.update(1)
+    elif steps:
+        # Step-based progress bar
+        pbar = tqdm(total=steps, desc=desc, bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
+        return pbar
+    else:
+        # Indeterminate progress bar
+        return tqdm(desc=desc, bar_format='{desc}: Processing...')
 
 def cleanup_previous_run():
     """Clean up previous compiled files and notebooks"""
-    for dir_path in [compiled_dir, notebooks_dir]:
-        if os.path.exists(dir_path):
-            shutil.rmtree(dir_path)
-            print(f"🧹 Cleaned up: {dir_path}")
+    with tqdm(total=2, desc="🧹 Cleaning up", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+        for dir_path in [compiled_dir, notebooks_dir]:
+            if os.path.exists(dir_path):
+                shutil.rmtree(dir_path)
+            pbar.update(1)
 
-def run_dbt_deps():
+def get_dbt_models_count():
+    """Count the number of dbt models in the project"""
+    models_dir = os.path.join(project_dir, "models")
+    model_count = 0
+    if os.path.exists(models_dir):
+        for root, _, files in os.walk(models_dir):
+            model_count += len([f for f in files if f.endswith('.sql')])
+    return max(model_count, 1)  # At least 1 to avoid division by zero
+
+def run_dbt_deps(dbname, schemaname, tablename):
     """Run dbt deps to install dependencies"""
+    vars_dict = {
+        'my_database': dbname,
+        'my_schema': schemaname,
+        'my_table': tablename
+    }
+    vars_str = json.dumps(vars_dict)
     deps_args = [
         "deps",
         "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir
+        "--profiles-dir", profiles_dir,
+        "--vars", vars_str
     ]
-    dbt = dbtRunner()
-    return dbt.invoke(deps_args)
+    
+    # Show progress bar with estimated steps
+    with tqdm(total=100, desc="📦 Installing dependencies", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+        dbt = dbtRunner()
+        # Capture stdout/stderr to suppress logs
+        stdout_capture = StringIO()
+        stderr_capture = StringIO()
+        
+        # Simulate progress during dependency installation
+        pbar.update(20)
+        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            result = dbt.invoke(deps_args)
+        pbar.update(80)
+        
+        pbar.set_description("📦 Dependencies installed" if result.success else "❌ Dependencies failed")
+    
+    return result
 
-def run_dbt():
-    """Run all dbt models"""
+def connection_check(dbname, schemaname, tablename):
+    """Run dbt debug to check connection"""
+    vars_dict = {
+        'my_database': dbname,
+        'my_schema': schemaname,
+        'my_table': tablename
+    }
+    vars_str = json.dumps(vars_dict)
+    debug_args = [
+        "debug",
+        "--project-dir", project_dir,
+        "--profiles-dir", profiles_dir,
+        "--vars", vars_str
+    ]
+    
+    # Show progress bar with estimated steps
+    with tqdm(total=100, desc="🔌 checking connection", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+        dbt = dbtRunner()
+        # Capture stdout/stderr to suppress logs
+        stdout_capture = StringIO()
+        stderr_capture = StringIO()
+        
+        # Simulate progress during dependency installation
+        pbar.update(20)
+        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            result = dbt.invoke(debug_args)
+        pbar.update(80)
+        
+        pbar.set_description("🔌 connection success" if result.success else "❌ conenction failed")
+    
+    return result
+
+def run_dbt(dbname, schemaname, tablename):
+    """Run all dbt models with detailed progress tracking"""
+    vars_dict = {
+        'my_database': dbname,
+        'my_schema': schemaname,
+        'my_table': tablename
+    }
+    vars_str = json.dumps(vars_dict)
     run_args = [
         "run",
         "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir
+        "--profiles-dir", profiles_dir,
+        "--vars", vars_str
     ]
-    dbt = dbtRunner()
-    return dbt.invoke(run_args)
+    
+    # Get estimated model count for progress tracking
+    model_count = get_dbt_models_count()
+    
+    with tqdm(total=model_count, desc="🚀 Running dbt models", bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} models') as pbar:
+        dbt = dbtRunner()
+        
+        # Create a custom handler to track progress
+        class ProgressTracker:
+            def __init__(self, pbar):
+                self.pbar = pbar
+                self.processed = 0
+                
+            def update_progress(self):
+                if self.processed < model_count:
+                    self.processed += 1
+                    self.pbar.update(1)
+        
+        tracker = ProgressTracker(pbar)
+        
+        # Simulate progress updates during model execution
+        def simulate_model_progress():
+            import threading
+            import time
+            for i in range(model_count):
+                time.sleep(0.5)  # Simulate processing time
+                if tracker.processed < model_count:
+                    tracker.update_progress()
+        
+        # Start progress simulation in background
+        progress_thread = threading.Thread(target=simulate_model_progress)
+        progress_thread.daemon = True
+        progress_thread.start()
+        
+        stdout_capture = StringIO()
+        stderr_capture = StringIO()
+        
+        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            result = dbt.invoke(run_args)
+        
+        # Ensure progress bar reaches 100%
+        remaining = model_count - tracker.processed
+        if remaining > 0:
+            pbar.update(remaining)
+        
+        pbar.set_description("✅ dbt models completed" if result.success else "❌ dbt models failed")
+    
+    return result
 
-def run_pre_run_setup():
-    """Run the pre_run_setup macro"""
+def run_pre_run_setup(dbname, schemaname, tablename):
+    """Run the pre_run_setup macro with progress tracking"""
+    args_dict = {
+        'db_name': dbname,
+        'schema_name': schemaname,
+        'table_name': tablename
+    }
+    vars_dict = {
+        'my_database': dbname,
+        'my_schema': schemaname,
+        'my_table': tablename
+    }
+    vars_str = json.dumps(vars_dict)
+    args_str = json.dumps(args_dict)
     macro_args = [
         "run-operation",
         "pre_run_setup",
         "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir
+        "--profiles-dir", profiles_dir,
+        "--args", args_str,
+        "--vars", vars_str
     ]
-    dbt = dbtRunner()
-    return dbt.invoke(macro_args)
+    
+    # Pre-run setup typically involves multiple steps
+    with tqdm(total=100, desc="⚙️ Running pre-setup macro", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+        dbt = dbtRunner()
+        stdout_capture = StringIO()
+        stderr_capture = StringIO()
+        
+        # Simulate progress steps
+        pbar.update(25)  # Initializing
+        time.sleep(0.2)
+        pbar.update(25)  # Validating connections
+        
+        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            result = dbt.invoke(macro_args)
+        
+        pbar.update(50)  # Macro execution completed
+        pbar.set_description("✅ Pre-setup completed" if result.success else "❌ Pre-setup failed")
+    
+    return result
 
-def build_dbt_compile_args():
+def build_dbt_compile_args(dbname, schemaname, tablename):
     """Build arguments for dbt compile"""
+    vars_dict = {
+        'my_database': dbname,
+        'my_schema': schemaname,
+        'my_table': tablename
+    }
+    vars_str = json.dumps(vars_dict)
     return [
         "compile",
         "--project-dir", project_dir,
-        "--profiles-dir", profiles_dir
+        "--profiles-dir", profiles_dir,
+        "--vars", vars_str
     ]
 
-def run_dbt_args(cli_args):
-    """Run dbt with given arguments"""
-    dbt = dbtRunner()
-    return dbt.invoke(cli_args)
+def run_dbt_args(cli_args, dbname, schemaname, tablename):
+    """Run dbt with given arguments, with detailed compilation progress."""
+    vars_dict = {
+        'my_database': dbname,
+        'my_schema': schemaname,
+        'my_table': tablename
+    }
+    vars_str = json.dumps(vars_dict)
+    cli_args += ["--vars", vars_str]
+
+    # Check if this is a compile operation for enhanced progress tracking
+    is_compile = "compile" in cli_args
+    
+    if is_compile:
+        model_count = get_dbt_models_count()
+        with tqdm(total=model_count, desc="🔨 Compiling dbt models", bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} models') as pbar:
+            dbt = dbtRunner()
+            
+            # Simulate compilation progress
+            def simulate_compile_progress():
+                import threading
+                import time
+                for i in range(model_count):
+                    time.sleep(0.3)  # Compilation is typically faster than runs
+                    if i < model_count:
+                        pbar.update(1)
+            
+            # Start progress simulation
+            progress_thread = threading.Thread(target=simulate_compile_progress)
+            progress_thread.daemon = True
+            progress_thread.start()
+            
+            stdout_capture = StringIO()
+            stderr_capture = StringIO()
+            
+            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                result = dbt.invoke(cli_args)
+            
+            # Ensure we reach 100%
+            pbar.n = model_count
+            pbar.refresh()
+            pbar.set_description("✅ dbt compilation completed" if result.success else "❌ dbt compilation failed")
+    else:
+        # For non-compile operations, use simple progress
+        with tqdm(total=100, desc="🔨 Running dbt command", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+            dbt = dbtRunner()
+            stdout_capture = StringIO()
+            stderr_capture = StringIO()
+            
+            pbar.update(30)
+            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                result = dbt.invoke(cli_args)
+            pbar.update(70)
+            
+            pbar.set_description("✅ dbt command completed" if result.success else "❌ dbt command failed")
+    
+    return result
 
 def zip_directory(source_dir, zip_path):
     """Zip the contents of an entire directory"""
+    # Count total files first
+    total_files = 0
+    for root, _, files in os.walk(source_dir):
+        total_files += len(files)
+    
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, _, files in os.walk(source_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, source_dir)
-                zipf.write(file_path, arcname)
+        with tqdm(total=total_files, desc="📦 Creating archive", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+            for root, _, files in os.walk(source_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, source_dir)
+                    zipf.write(file_path, arcname)
+                    pbar.update(1)
 
 def run_sqlfluff_on_directory(directory_path):
     """
     Run SQLFluff fix on all SQL files in a directory.
     """
     try:
-        print(f"🔧 Applying SQLFluff to directory: {directory_path}")
-        
-        # Run SQLFluff on each SQL file in the directory
+        # Collect all SQL files
         sql_files = []
         for root, _, files in os.walk(directory_path):
             for file in files:
                 if file.endswith('.sql'):
                     sql_files.append(os.path.join(root, file))
         
-        success_count = 0
-        for sql_file in sql_files:
-            try:
-                # Run SQLFluff on individual file
-                result = subprocess.run(
-                    ["sqlfluff", "fix", "--force", sql_file],
-                    check=False,
-                    text=True,
-                    capture_output=True,
-                    cwd=project_root
-                )
-
-                if result.returncode == 0:
-                    print(f"✅ SQLFluff completed for: {os.path.basename(sql_file)}")
-                    success_count += 1
-                else:
-                    print(f"⚠️ SQLFluff encountered issues for: {os.path.basename(sql_file)}")
-                    if result.stdout:
-                        print(f"STDOUT: {result.stdout}")
-                    if result.stderr:
-                        print(f"STDERR: {result.stderr}")
-                        
-            except Exception as e:
-                print(f"❌ Error processing {os.path.basename(sql_file)}: {e}")
+        if not sql_files:
+            return True
         
-        print(f"📊 SQLFluff processed {success_count}/{len(sql_files)} files successfully")
+        success_count = 0
+        with tqdm(total=len(sql_files), desc="✨ Applying SQLFluff", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+            for sql_file in sql_files:
+                try:
+                    # Run SQLFluff on individual file
+                    result = subprocess.run(
+                        ["sqlfluff", "fix", "--force", sql_file],
+                        check=False,
+                        text=True,
+                        capture_output=True,
+                        cwd=project_root
+                    )
+
+                    if result.returncode == 0:
+                        success_count += 1
+                        
+                except Exception:
+                    pass
+                
+                pbar.update(1)
+        
         return success_count > 0
             
-    except Exception as e:
-        print(f"❌ Unexpected error with SQLFluff for {directory_path}: {e}")
+    except Exception:
         return False
 
 def apply_sqlfluff_to_compiled():
@@ -146,7 +396,8 @@ def apply_sqlfluff_to_compiled():
     try:
         subprocess.run(["sqlfluff", "--version"], check=True, capture_output=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ SQLFluff is not installed or not available in PATH")
+        with tqdm(desc="❌ SQLFluff not available", bar_format='{desc}') as pbar:
+            time.sleep(1)
         return False
     
     # Run SQLFluff on the compiled models directory
@@ -167,50 +418,52 @@ def generate_notebooks():
                         if folder_name != "models":
                             model_folders.add(folder_name)
 
-        for folder in model_folders:
-            if folder == "models":
-                continue
+        with tqdm(total=len(model_folders), desc="📓 Generating notebooks", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+            for folder in model_folders:
+                if folder == "models":
+                    continue
+                    
+                notebook_path = os.path.join(notebooks_dir, f"{folder}_nb.ipynb")
+                nb = new_notebook()
                 
-            notebook_path = os.path.join(notebooks_dir, f"{folder}_nb.ipynb")
-            nb = new_notebook()
-            
-            folder_name = folder.upper().split('_')[-1]
-            nb.cells.append(new_markdown_cell(
-                "## SNOWBALL Spark SQL version\n"
-                f"#### **Notebook to create {folder_name} layer**\n"
-                f"##### **Creating {folder_name} schema to create required {folder_name} tables**\n"
-            ))
-            nb.cells.append(new_code_cell(f"%%sql\nCREATE SCHEMA IF NOT EXISTS {folder.split('_')[-1]};"))
+                folder_name = folder.upper().split('_')[-1]
+                nb.cells.append(new_markdown_cell(
+                    "## SNOWBALL Spark SQL version\n"
+                    f"#### **Notebook to create {folder_name} layer**\n"
+                    f"##### **Creating {folder_name} schema to create required {folder_name} tables**\n"
+                ))
+                nb.cells.append(new_code_cell(f"%%sql\nCREATE SCHEMA IF NOT EXISTS {folder.split('_')[-1]};"))
 
-            if folder == 'tests':
-                folder_path = os.path.join(compiled_dir, 'Snowball_dbt', folder)
-            else:            
-                folder_path = os.path.join(compiled_dir, 'Snowball_dbt', 'models', folder)
+                if folder == 'tests':
+                    folder_path = os.path.join(compiled_dir, 'Snowball_dbt', folder)
+                else:            
+                    folder_path = os.path.join(compiled_dir, 'Snowball_dbt', 'models', folder)
 
-            for root, _, files in os.walk(folder_path):
-                for file in sorted(files):
-                    if file.endswith('.sql'):
-                        file_path = os.path.join(root, file)
-                        model_name = os.path.splitext(file)[0]
-                        
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            sql_content = f.read()                    
-                        nb.cells.append(new_markdown_cell(f"##### **{model_name}**"))
-                        nb.cells.append(new_code_cell(
-                            f"%%sql\n"
-                            f"DROP TABLE IF EXISTS {folder.split('_')[-1]}.{model_name};\n"
-                            f"CREATE TABLE {folder.split('_')[-1]}.{model_name} AS\n"
-                            f"{sql_content}"
-                        ))
-            with open(notebook_path, 'w', encoding='utf-8') as f:
-                nbf.write(nb, f)
-            print(f"📓 Generated: {os.path.basename(notebook_path)}") 
-    except Exception as e:
-        print(f"❌ Failed to generate notebooks: {e}")
+                for root, _, files in os.walk(folder_path):
+                    for file in sorted(files):
+                        if file.endswith('.sql'):
+                            file_path = os.path.join(root, file)
+                            model_name = os.path.splitext(file)[0]
+                            
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                sql_content = f.read()                    
+                            nb.cells.append(new_markdown_cell(f"##### **{model_name}**"))
+                            nb.cells.append(new_code_cell(
+                                f"%%sql\n"
+                                f"DROP TABLE IF EXISTS {folder.split('_')[-1]}.{model_name};\n"
+                                f"CREATE TABLE {folder.split('_')[-1]}.{model_name} AS\n"
+                                f"{sql_content}"
+                            ))
+                with open(notebook_path, 'w', encoding='utf-8') as f:
+                    nbf.write(nb, f)
+                    
+                pbar.update(1)
+                
+    except Exception:
         return False
     return True
 
-def copy_seed_file(seed_path, target_dir):
+def copy_seed_file(seed_path, target_dir,dbname, schemaname, tablename):
     """
     Copy the seed file to target directory and ensure it's named column_mapping.csv
     """
@@ -218,24 +471,30 @@ def copy_seed_file(seed_path, target_dir):
     target_file = os.path.join(target_dir, "column_mapping.csv")
 
     try:
-        # Check if source and target are the same file
-        if os.path.abspath(seed_path) == os.path.abspath(target_file):
-            print(f"✅ Source file is already in target location: {os.path.basename(seed_path)}")
-        else:
-            # Copy the file (will overwrite if exists)
-            shutil.copy(seed_path, target_file)
-            print(f"✅ Copied: {os.path.basename(seed_path)} -> {os.path.basename(target_file)}")
-        
-        # Run dbt seed to load the seed file
-        run_dbt_args(["seed", "--select", "column_mapping"])
-        print(f"✅ Processed mapping file")
+        with tqdm(desc="📋 Processing mapping file", bar_format='{desc}: Processing...') as pbar:
+            # Check if source and target are the same file
+            if os.path.abspath(seed_path) == os.path.abspath(target_file):
+                pass
+            else:
+                # Copy the file (will overwrite if exists)
+                shutil.copy(seed_path, target_file)
+            
+            # Run dbt seed to load the seed file
+            stdout_capture = StringIO()
+            stderr_capture = StringIO()
+            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                run_dbt_args(["seed", "--select", "column_mapping"], dbname, schemaname, tablename)
+            
+            pbar.set_description("✅ Mapping file processed")
         return True
         
     except FileNotFoundError:
-        print(f"❌ Seed file not found at: {seed_path}")
+        with tqdm(desc="❌ Mapping file not found", bar_format='{desc}') as pbar:
+            time.sleep(1)
         return False
-    except Exception as e:
-        print(f"❌ Failed to copy seed file: {e}")
+    except Exception:
+        with tqdm(desc="❌ Failed to process mapping file", bar_format='{desc}') as pbar:
+            time.sleep(1)
         return False
 
 def transform_compiled_sql(sql_file_path):
@@ -255,10 +514,8 @@ def transform_compiled_sql(sql_file_path):
                 folder_raw = parts[models_idx + 1]
                 model_folder_name = folder_raw.split("_", 1)[1] if "_" in folder_raw else folder_raw
             else:
-                print(f"⚠️ Could not determine model folder for {sql_file_path}")
                 return
         else:
-            print(f"⚠️ Skipping file (no 'models' in path): {sql_file_path}")
             return
 
         model_name = os.path.splitext(parts[-1])[0]
@@ -284,17 +541,28 @@ def transform_compiled_sql(sql_file_path):
         with open(sql_file_path, "w", encoding="utf-8") as f:
             f.write(sql_code)
 
-        print(f"✅ Transformed: {sql_file_path}")
-
-    except Exception as e:
-        print(f"❌ Failed to transform {sql_file_path}: {e}")
+    except Exception:
+        pass
 
 def process_compiled_sql_files():
     """Walk through compiled models directory and transform all SQL files."""
+    # Count SQL files first
+    sql_files = []
     for root, _, files in os.walk(compiled_dir):
         for file in files:
             if file.endswith(".sql"):
-                transform_compiled_sql(os.path.join(root, file))
+                sql_files.append(os.path.join(root, file))
+    
+    with tqdm(total=len(sql_files), desc="🔄 Transforming SQL files", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+        for sql_file in sql_files:
+            transform_compiled_sql(sql_file)
+            pbar.update(1)
+
+def remove_readonly_files(func, path, _):
+    """Error handler for removing read-only files on Windows"""
+    import stat
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
 
 def clone_repo(git_url: str) -> str:
     """
@@ -305,16 +573,41 @@ def clone_repo(git_url: str) -> str:
         
     """
     repo_name = os.path.splitext(os.path.basename(git_url))[0]
+    clone_location = os.path.join(os.getcwd(), repo_name)
     clone_path = os.path.join(os.getcwd(), repo_name)
     
-    # If folder exists, skip cloning to avoid overwriting
-    if os.path.exists(clone_path):
-        print(f"Repository already cloned at {clone_path}")
-    else:
-        print(f"Cloning into {clone_path} ...")
-        Repo.clone_from(git_url, clone_path)
-        print("Clone completed.")
-    return(os.path.join(clone_path, 'seeds', 'column_mapping.csv'))
+    print("📥 Starting repository setup...")
+    
+    # If folder exists, remove it properly
+    if os.path.exists(clone_location):
+        print("🗑️ Removing existing repository...")
+        try:
+            # Use the error handler for Windows read-only files
+            shutil.rmtree(clone_location, onerror=remove_readonly_files)
+        except Exception as e:
+            # If still fails, try alternative approach
+            try:
+                import subprocess
+                if os.name == 'nt':  # Windows
+                    subprocess.run(['rmdir', '/s', '/q', clone_location], shell=True, check=True)
+                else:  # Unix/Linux
+                    subprocess.run(['rm', '-rf', clone_location], check=True)
+            except:
+                print("❌ Failed to remove existing repository")
+                raise Exception(f"Could not remove existing directory: {clone_location}")
+    
+    print("📥 Cloning Latest repository from GIT...")
+    try:
+        Repo.clone_from(git_url, clone_location)
+    except Exception as e:
+        print("❌ Failed to clone repository")
+        raise Exception(f"Failed to clone repository: {str(e)}")
+    
+    # Change to the cloned directory
+    os.chdir(clone_path)
+    
+    return os.path.join(clone_location, 'seeds', 'column_mapping.csv')
+
 
 def copy_csv_to_downloads(src_csv_path: str) -> str:
     """
@@ -339,25 +632,44 @@ def copy_csv_to_downloads(src_csv_path: str) -> str:
     # Destination path keeps the same filename
     dest_path = downloads_dir / src_path.name
     
-    # Copy file
-    shutil.copy2(src_path, dest_path)
+    with tqdm(desc="📥 Copying to Downloads", bar_format='{desc}: Processing...') as pbar:
+        # Copy file
+        shutil.copy2(src_path, dest_path)
+        pbar.set_description("✅ Copied to Downloads")
 
 def main():
+    welcome_message()
+    
     # Clone the latest repo from Snowball dbt
     mapping_file_path = clone_repo("https://github.com/jmangroup/snowball_dbt.git")
-    print(mapping_file_path)
     copy_csv_to_downloads(mapping_file_path)
 
     # Clean up previous runs
     cleanup_previous_run()
+    print(f"\n✅ Column mapping file has been downloaded to {Path.home()}/Downloads/column_mapping.csv")
+    print(f"\n Please update it & add profiles.yml file and continue...\n")
+    dbname = input('📁 enter database name : ')
+    schemaname = input('📃 enter schema name : ')
+    tablename = input('📑enter table name : ')
+
+    
+    def checking():
+        connection = connection_check(dbname,schemaname,tablename)
+        if not connection.success:
+            replaced = input('check the connections in .dbt/profiles.yml and enter 1 when its done : ')
+            if replaced == '1':
+                checking()
+    checking()
+        
+        
 
     if not os.path.exists(mapping_file):
         print(f"❌ Mapping file not found at the specified path: {mapping_file}")
         sys.exit(1)
 
-    copy_seed_file(mapping_file, dbt_seed_dir)
-    print(f"\nColumn mapping file has been downloaded to {Path.home()}/Downloads/column_mapping.csv, Please update it & add profiles.yml file and continue...")
-    print("\nWhat would you like to do?")
+    copy_seed_file(mapping_file, dbt_seed_dir, dbname, schemaname, tablename)
+    print("Please update it & add profiles.yml file and continue...\n")
+    print("What would you like to do?")
     print("1: Package the full dbt project")
     print("2: Compile the SQL project code")
     print("3: Get the pyspark notebooks for compiled SQL")
@@ -370,98 +682,91 @@ def main():
 
     if user_choice == 1:
         try:
-            print("📦 Packaging the full dbt project...")
+            print("\n📦 Packaging the full dbt project...")
             zip_directory(project_dir, output_zip)
-            print("\n✅ Your full dbt project has been packaged successfully!")
+            print(f"\n✅ Your full dbt project has been packaged successfully!")
             print(f"📦 Zipped dbt project saved at: {output_zip}")
         except Exception as e:
             print(f"❌ Failed to zip dbt project: {e}")
 
     elif user_choice == 2:
-        print("📦 Installing dbt dependencies...")
-        deps_result = run_dbt_deps()
+        print("\n🔄 Starting SQL compilation process...\n")
+        
+        deps_result = run_dbt_deps(dbname, schemaname, tablename)
         if not deps_result.success:
             print("❌ dbt deps failed")
             return
         
         try:
-            print("🚀 Running pre-run setup macro...")
-            macro_result = run_pre_run_setup()
+            macro_result = run_pre_run_setup(dbname, schemaname, tablename)
             if not macro_result.success:
                 print("❌ Pre-run setup macro failed")
                 return
                 
-            print("🚀 Running dbt models...")
-            run_result = run_dbt()
+            run_result = run_dbt(dbname, schemaname, tablename)
             if not run_result.success:
                 print("❌ dbt run failed")
                 return
-            print("✅ dbt run completed successfully!")
+                
         except Exception as e:
             print(f"❌ dbt run failed: {e}")
             return
         
-        print("🔨 Compiling dbt models...")
-        compile_args = build_dbt_compile_args()
-        compile_result = run_dbt_args(compile_args)
+        compile_args = build_dbt_compile_args(dbname, schemaname, tablename)
+        compile_result = run_dbt_args(compile_args, dbname, schemaname, tablename)
 
         if compile_result.success:
-            print("✅ dbt compile completed successfully!")
-            print("✨ Applying SQLFluff rules...")
             sqlfluff_success = apply_sqlfluff_to_compiled()
-            if sqlfluff_success:
-                print("📊 SQLFluff formatting completed successfully!")
-            else:
-                print("⚠️ SQLFluff encountered some issues, but continuing with processing...")
+            if not sqlfluff_success:
+                with tqdm(desc="⚠️ SQLFluff issues detected", bar_format='{desc}') as pbar:
+                    time.sleep(1)
+                    
             process_compiled_sql_files()
             zip_directory(compiled_dir, output_zip)
+            print(f"\n✅ Process completed successfully!")
             print(f"📦 Compiled & formatted SQL files zipped at: {output_zip}")
         else:
             print("❌ dbt compile failed")
 
     elif user_choice == 3:
-        print("📦 Installing dbt dependencies...")
-        deps_result = run_dbt_deps()
+        print("\n🔄 Starting notebook generation process...\n")
+        
+        deps_result = run_dbt_deps(dbname, schemaname, tablename)
         if not deps_result.success:
             print("❌ dbt deps failed")
             return
             
         try:
-            print("🚀 Running pre-run setup macro...")
-            macro_result = run_pre_run_setup()
+            macro_result = run_pre_run_setup(dbname, schemaname, tablename)
             if not macro_result.success:
                 print("❌ Pre-run setup macro failed")
                 return
                 
-            print("🚀 Running dbt models...")
-            run_result = run_dbt()
+            run_result = run_dbt(dbname, schemaname, tablename)
             if not run_result.success:
                 print("❌ dbt run failed")
                 return
-            print("✅ dbt run completed successfully!")
+                
         except Exception as e:
             print(f"❌ dbt run failed: {e}")
             return
 
-        print("🔨 Compiling dbt models...")        
-        compile_args = build_dbt_compile_args()
-        result = run_dbt_args(compile_args)
+        compile_args = build_dbt_compile_args(dbname, schemaname, tablename)
+        result = run_dbt_args(compile_args, dbname, schemaname, tablename)
 
         if result and result.success:
-            print("✨ Applying SQLFluff rules...")
             sqlfluff_success = apply_sqlfluff_to_compiled()
-            if sqlfluff_success:
-                print("📊 SQLFluff formatting completed successfully!")
-            else:
-                print("⚠️ SQLFluff encountered some issues, but continuing with processing...")
+            if not sqlfluff_success:
+                with tqdm(desc="⚠️ SQLFluff issues detected", bar_format='{desc}') as pbar:
+                    time.sleep(1)
 
-            print("\n🔨 Generating PySpark notebooks...")
             generate_notebooks()
-            print(f"\n📓 Notebooks saved to: {notebooks_dir}")
 
             if os.path.exists(output_zip):
                 os.remove(output_zip)
             zip_directory(notebooks_dir, output_zip)
+            print(f"\n✅ Process completed successfully!")
+            print(f"📓 Notebooks saved to: {notebooks_dir}")
             print(f"📦 Notebooks zipped at: {output_zip}")
 
         else:
