@@ -3,7 +3,7 @@ README.md
 setup.py
 snowball/__init__.py
 snowball/config.py
-snowball/run_dbt.py
+snowball/snowball.py
 snowball/test.py
 snowball.egg-info/PKG-INFO
 snowball.egg-info/SOURCES.txt
