@@ -12,6 +12,7 @@ import json
 import zipfile
 import shutil
 import subprocess
+import msvcrt
 import time
 from .config import *
 from git import Repo
@@ -36,6 +37,9 @@ output_zip    = os.path.join(output_dir, "compiled_models.zip")
 dbt_seed_dir  = os.path.join(project_dir, "seeds")
 notebooks_dir = os.path.join(output_dir, "notebooks")
 
+
+############  Formatting Functions ##############
+
 def welcome_message():
     message = "Welcome to Snowball Product!"
     width = len(message) + 8  # padding for stars
@@ -53,6 +57,77 @@ def welcome_message():
     print(line1.center(term_width))
     print(line2.center(term_width))
     print(line3.center(term_width))
+
+def rotating_slash_after(text, duration_sec=5, passed=1):
+    print(text, end=" ", flush=True)
+    spinner = ['|', '/', '-', '\\']
+    end_time = time.time() + duration_sec
+    i = 0
+    while time.time() < end_time:
+        sys.stdout.write('\r' + text + " " + spinner[i % len(spinner)])
+        sys.stdout.flush()
+        time.sleep(0.1)
+        i += 1
+    green_tick = "\u2714"     # Unicode check mark
+    green_color = "\033[92m"  # ANSI green
+    red_cross = "\u274C"
+    red_color = "\033[91m"
+    reset_color = "\033[0m"   # Reset color
+    if(passed == 1):
+        print_msg = f"{text} {green_color}Done {green_tick}{reset_color}\n"
+    else:
+        print_msg = f"{text} {red_color}Failed {red_cross}{reset_color}\n"
+    sys.stdout.write('\r' + print_msg)
+    sys.stdout.flush()
+
+
+def blinking_dots_input(base_text="Press Enter to continue"):
+    dots = ['', '.', '..', '...']
+    i = 0
+    print(base_text, end='', flush=True)
+
+    while True:
+        print('\r' + base_text + dots[i % len(dots)] + '   ', end='', flush=True)
+        time.sleep(0.5)
+        i += 1
+
+        # Non-blocking key check for Enter press
+        if msvcrt.kbhit():
+            key = msvcrt.getwch()
+            if key == '\r':  # Enter key on Windows
+                break
+
+def initial_set_up():
+    text = "Setting up initial requirements"
+    width = len(text) + 8  # padding for stars
+    border = "*" * width
+
+    # Prepare the lines to print
+    line1 = border
+    line2 = " " + text.center(width - 2)
+    line3 = ("*" * (len(line2) // 3)).center(width - 2)
+    line4 = "1. Collecting latest repo from Git "
+    line5 = f"2. Column mapping file has been downloaded to {Path.home()}/Downloads/column_mapping.csv "
+    line6 = "3. Please update Column mapping file as per your revenue data and save it to Downloads"
+    line7 = "4. Create a folder .dbt in the root directory and create a profiles.yml file"
+    line8 = "5. Update profiles.yml with your database credentials - Please refer Readme for more details [https://github.com/jmangroup/snowball_dbt#](https://github.com/jmangroup/snowball_dbt#]"
+    line9 = "Press Enter to continue "
+
+    # Get terminal width
+    term_width = shutil.get_terminal_size().columns
+
+    # Center the output lines relative to terminal width
+    print(line1)
+    print(line2)
+    print(line3)
+    rotating_slash_after(line4, 5)
+    rotating_slash_after(line5, 1)
+    print(line6)
+    print(line7)
+    print(line8)
+    blinking_dots_input(line9)
+
+
 
 def show_progress(desc, duration=None, steps=None):
     """Show a progress bar for a given operation"""
@@ -73,11 +148,9 @@ def show_progress(desc, duration=None, steps=None):
 
 def cleanup_previous_run():
     """Clean up previous compiled files and notebooks"""
-    with tqdm(total=2, desc="🧹 Cleaning up", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
-        for dir_path in [compiled_dir, notebooks_dir]:
-            if os.path.exists(dir_path):
-                shutil.rmtree(dir_path)
-            pbar.update(1)
+    for dir_path in [compiled_dir, notebooks_dir]:
+        if os.path.exists(dir_path):
+            shutil.rmtree(dir_path)
 
 def get_dbt_models_count():
     """Count the number of dbt models in the project"""
@@ -575,12 +648,10 @@ def clone_repo(git_url: str) -> str:
     repo_name = os.path.splitext(os.path.basename(git_url))[0]
     clone_location = os.path.join(os.getcwd(), repo_name)
     clone_path = os.path.join(os.getcwd(), repo_name)
-    
-    print("📥 Starting repository setup...")
+
     
     # If folder exists, remove it properly
     if os.path.exists(clone_location):
-        print("🗑️ Removing existing repository...")
         try:
             # Use the error handler for Windows read-only files
             shutil.rmtree(clone_location, onerror=remove_readonly_files)
@@ -596,7 +667,6 @@ def clone_repo(git_url: str) -> str:
                 print("❌ Failed to remove existing repository")
                 raise Exception(f"Could not remove existing directory: {clone_location}")
     
-    print("📥 Cloning Latest repository from GIT...")
     try:
         Repo.clone_from(git_url, clone_location)
     except Exception as e:
@@ -632,10 +702,10 @@ def copy_csv_to_downloads(src_csv_path: str) -> str:
     # Destination path keeps the same filename
     dest_path = downloads_dir / src_path.name
     
-    with tqdm(desc="📥 Copying to Downloads", bar_format='{desc}: Processing...') as pbar:
-        # Copy file
-        shutil.copy2(src_path, dest_path)
-        pbar.set_description("✅ Copied to Downloads")
+    # with tqdm(desc="📥 Copying to Downloads", bar_format='{desc}: Processing...') as pbar:
+    #     # Copy file
+    #     shutil.copy2(src_path, dest_path)
+    #     pbar.set_description("✅ Copied to Downloads")
 
 def main():
     welcome_message()
@@ -646,19 +716,34 @@ def main():
 
     # Clean up previous runs
     cleanup_previous_run()
-    print(f"\n✅ Column mapping file has been downloaded to {Path.home()}/Downloads/column_mapping.csv")
-    print(f"\n Please update it & add profiles.yml file and continue...\n")
+    initial_set_up()
     dbname = input('📁 enter database name : ')
     schemaname = input('📃 enter schema name : ')
-    tablename = input('📑enter table name : ')
+    tablename = input('📑Enter revenue table name : ')
 
-    
+    text = f"Checking {dbname} database Connection!"
+    width = len(text) + 8  # padding for stars
+    border = "*" * width
+
+    # Prepare the lines to print
+    line1 = border
+    line2 = " " + text.center(width - 2)
+    line3 = ("*" * (len(line2) // 3)).center(width - 2)
+    line4 = "Establishing Connection "
+    print(line1)
+    print(line2)
+    print(line3)
+
     def checking():
         connection = connection_check(dbname,schemaname,tablename)
+        if connection.success:
+            rotating_slash_after(line4,8,1)
+            print("\u263A Connection Established Successfully!")
         if not connection.success:
-            replaced = input('check the connections in .dbt/profiles.yml and enter 1 when its done : ')
-            if replaced == '1':
-                checking()
+            rotating_slash_after(line4,8,1)
+            print("\u2639 Connection Failed!")
+            blinking_dots_input("Update Your Profiles.yml correctly and Press Enter to check the connection again ")
+            checking()
     checking()
         
         
@@ -668,7 +753,6 @@ def main():
         sys.exit(1)
 
     copy_seed_file(mapping_file, dbt_seed_dir, dbname, schemaname, tablename)
-    print("Please update it & add profiles.yml file and continue...\n")
     print("What would you like to do?")
     print("1: Package the full dbt project")
     print("2: Compile the SQL project code")
