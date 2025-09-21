@@ -547,19 +547,18 @@ def copy_seed_file(seed_path, target_dir,dbname, schemaname, tablename):
     target_file = os.path.join(target_dir, "column_mapping.csv")
 
     try:
-        with tqdm(desc="📋 Processing mapping file", bar_format='{desc}: Processing...') as pbar:
-            # Check if source and target are the same file
-            if os.path.abspath(seed_path) == os.path.abspath(target_file):
-                pass
-            else:
-                # Copy the file (will overwrite if exists)
-                shutil.copy(seed_path, target_file)
-            
-            # Run dbt seed to load the seed file
-            stdout_capture = StringIO()
-            stderr_capture = StringIO()
-            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-                run_dbt_args(["seed", "--select", "column_mapping"], dbname, schemaname, tablename)
+        # Check if source and target are the same file
+        if os.path.abspath(seed_path) == os.path.abspath(target_file):
+            pass
+        else:
+            # Copy the file (will overwrite if exists)
+            shutil.copy(seed_path, target_file)
+        
+        # Run dbt seed to load the seed file
+        stdout_capture = StringIO()
+        stderr_capture = StringIO()
+        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            run_dbt_args(["seed", "--select", "column_mapping"], dbname, schemaname, tablename)
             
         return True
         
@@ -806,6 +805,7 @@ def main():
         if user_choice == 3:
             text = "\n Generating Fanric adaptable dbt code ..."
         rotating_slash_after(text, 10)
+        rotating_slash_after('test', 5)
         try:
             output_zip    = os.path.join(output_dir, "snowball_dbt.zip")
             zip_directory(project_dir, output_zip)
