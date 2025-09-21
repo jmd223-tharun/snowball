@@ -126,6 +126,9 @@ def initial_set_up():
     print(line7)
     print(line8)
     blinking_dots_input(line9)
+    print("\n")
+    print(line1)
+    print("\n")
 
 
 
@@ -194,6 +197,8 @@ def run_dbt_deps(dbname, schemaname, tablename):
     return result
 
 def connection_check(dbname, schemaname, tablename):
+    term_width = shutil.get_terminal_size().columns
+    bar_width = term_width // 4
     """Run dbt debug to check connection"""
     vars_dict = {
         'my_database': dbname,
@@ -209,7 +214,7 @@ def connection_check(dbname, schemaname, tablename):
     ]
     
     # Show progress bar with estimated steps
-    with tqdm(total=100, desc="🔌 checking connection", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+    with tqdm(total=100, desc="Establishing Connection", bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|') as pbar:
         dbt = dbtRunner()
         # Capture stdout/stderr to suppress logs
         stdout_capture = StringIO()
@@ -221,7 +226,7 @@ def connection_check(dbname, schemaname, tablename):
             result = dbt.invoke(debug_args)
         pbar.update(80)
         
-        pbar.set_description("🔌 connection success" if result.success else "❌ conenction failed")
+        pbar.set_description("Establishing Connection" if result.success else "❌ Failed")
     
     return result
 
@@ -717,11 +722,9 @@ def main():
     # Clean up previous runs
     cleanup_previous_run()
     initial_set_up()
-    dbname = input('📁 enter database name : ')
-    schemaname = input('📃 enter schema name : ')
-    tablename = input('📑Enter revenue table name : ')
 
-    text = f"Checking {dbname} database Connection!"
+
+    text = f"Checking Database Connection!"
     width = len(text) + 8  # padding for stars
     border = "*" * width
 
@@ -733,15 +736,19 @@ def main():
     print(line1)
     print(line2)
     print(line3)
+    tablename = input('Enter revenue table name : ')
+    db_config = load_dbt_profile("Snowball_dbt", "dev")
+    dbname = db_config.get("database")
+    schemaname = db_config.get("schema")
 
     def checking():
         connection = connection_check(dbname,schemaname,tablename)
         if connection.success:
             rotating_slash_after(line4,8,1)
-            print("\u263A Connection Established Successfully!")
+            print("\u263A Connection Established Successfully! ✅")
         if not connection.success:
             rotating_slash_after(line4,8,1)
-            print("\u2639 Connection Failed!")
+            print("\u2639 Connection Failed! ❌")
             blinking_dots_input("Update Your Profiles.yml correctly and Press Enter to check the connection again ")
             checking()
     checking()
