@@ -329,7 +329,7 @@ def run_pre_run_setup(dbname, schemaname, tablename):
             result = dbt.invoke(macro_args)
         
         pbar.update(50)  # Macro execution completed
-        pbar.set_description("✅ Pre-setup completed" if result.success else "❌ Pre-setup failed")
+        pbar.set_description("\nPre-setup completed" if result.success else "\nPre-setup failed")
     
     return result
 
@@ -561,7 +561,6 @@ def copy_seed_file(seed_path, target_dir,dbname, schemaname, tablename):
             with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
                 run_dbt_args(["seed", "--select", "column_mapping"], dbname, schemaname, tablename)
             
-            pbar.set_description("✅ Mapping file processed")
         return True
         
     except FileNotFoundError:
@@ -742,9 +741,9 @@ def main():
         connection = connection_check(dbname,schemaname,tablename)
         if connection.success:
             # rotating_slash_after(line4,8,1)
-            print("\U0001F642 Connection Established Successfully! \u2714")
+            print("\U0001F642 Connection Established Successfully! \n")
         if not connection.success:
-            print("\U0001F641 Connection Failed! \u274C")
+            print("\U0001F641 Connection Failed! \n")
             blinking_dots_input("Update Your Profiles.yml correctly and Press Enter to check the connection again ")
             checking()
     checking()
@@ -768,7 +767,7 @@ def main():
     print(line3)
 
     copy_seed_file(mapping_file, dbt_seed_dir, dbname, schemaname, tablename)
-    print("Select the Database Platform")
+    print("Available Database Platform")
     print("     1: Snowflake")
     print("     2: Databricks")
     print("     3: Fabric")
@@ -783,13 +782,13 @@ def main():
         return
     
     print(line3)
-    print("Select the Snowball Version")
+    print("Available Snowball Version")
     print("     1: dbt")
     print("     2: sql")
     print("     3: Spark sql")
     print("     4: Redshift - N/A")
 
-    final_text = "Happy Coding! Please contact Snowball Product team for any Support! \U0001F642"
+    final_text = "  Thanks for using Snowball Product! Happy coding! \U0001F642  "
     # Get terminal width
     term_width = shutil.get_terminal_size().columns
     try:
@@ -806,8 +805,8 @@ def main():
             text = "\n Generating Databricks adaptable dbt code ..."
         if user_choice == 3:
             text = "\n Generating Fanric adaptable dbt code ..."
+        rotating_slash_after(text, 10)
         try:
-            rotating_slash_after(text, duration_sec=10, passed=1)
             output_zip    = os.path.join(output_dir, "snowball_dbt.zip")
             zip_directory(project_dir, output_zip)
             print(f"snowball_dbt code is saved at: {output_zip}\n")
