@@ -33,11 +33,11 @@ os.chdir(project_root)
 
 project_dir  = os.path.join(project_dir, "snowball_dbt")
 compiled_dir  = os.path.join(project_dir, "target", "compiled")
-output_zip    = os.path.join(output_dir, "compiled_models.zip")
 dbt_seed_dir  = os.path.join(project_dir, "seeds")
 notebooks_dir = os.path.join(output_dir, "notebooks")
 
-
+term_width = shutil.get_terminal_size().columns
+bar_width = term_width // 4
 ############  Formatting Functions ##############
 
 def welcome_message():
@@ -110,7 +110,7 @@ def initial_set_up():
     line5 = f"2. Column mapping file has been downloaded to {Path.home()}/Downloads/column_mapping.csv "
     line6 = "3. Please update Column mapping file as per your revenue data and save it to Downloads"
     line7 = "4. Create a folder .dbt in the root directory and create a profiles.yml file"
-    line8 = "5. Update profiles.yml with your database credentials - Please refer Readme for more details [https://github.com/jmangroup/snowball_dbt#](https://github.com/jmangroup/snowball_dbt#]"
+    line8 = "5. Update profiles.yml with your database credentials - Please refer Readme for more details [https://github.com/jmangroup/snowball_dbt#]"
     line9 = "Press Enter to continue "
 
     # Get terminal width
@@ -136,14 +136,14 @@ def show_progress(desc, duration=None, steps=None):
     """Show a progress bar for a given operation"""
     if duration:
         # Time-based progress bar
-        with tqdm(total=100, desc=desc, bar_format='{desc}: {percentage:3.0f}%|{bar}| {elapsed}') as pbar:
+        with tqdm(total=100, desc=desc, bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}| {elapsed}') as pbar:
             step_time = duration / 100
             for i in range(100):
                 time.sleep(step_time)
                 pbar.update(1)
     elif steps:
         # Step-based progress bar
-        pbar = tqdm(total=steps, desc=desc, bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
+        pbar = tqdm(total=steps, desc=desc, bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}| {n_fmt}/{total_fmt}')
         return pbar
     else:
         # Indeterminate progress bar
@@ -180,7 +180,7 @@ def run_dbt_deps(dbname, schemaname, tablename):
     ]
     
     # Show progress bar with estimated steps
-    with tqdm(total=100, desc="📦 Installing dependencies", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+    with tqdm(total=100, desc="Installing dependencies", bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|') as pbar:
         dbt = dbtRunner()
         # Capture stdout/stderr to suppress logs
         stdout_capture = StringIO()
@@ -192,13 +192,11 @@ def run_dbt_deps(dbname, schemaname, tablename):
             result = dbt.invoke(deps_args)
         pbar.update(80)
         
-        pbar.set_description("📦 Dependencies installed" if result.success else "❌ Dependencies failed")
+        pbar.set_description("Dependencies installed" if result.success else "❌ Dependencies failed")
     
     return result
 
 def connection_check(dbname, schemaname, tablename):
-    term_width = shutil.get_terminal_size().columns
-    bar_width = term_width // 4
     """Run dbt debug to check connection"""
     vars_dict = {
         'my_database': dbname,
@@ -248,7 +246,7 @@ def run_dbt(dbname, schemaname, tablename):
     # Get estimated model count for progress tracking
     model_count = get_dbt_models_count()
     
-    with tqdm(total=model_count, desc="🚀 Running dbt models", bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} models') as pbar:
+    with tqdm(total=model_count, desc="Running dbt models", bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}| {n_fmt}/{total_fmt} models') as pbar:
         dbt = dbtRunner()
         
         # Create a custom handler to track progress
@@ -317,7 +315,7 @@ def run_pre_run_setup(dbname, schemaname, tablename):
     ]
     
     # Pre-run setup typically involves multiple steps
-    with tqdm(total=100, desc="⚙️ Running pre-setup macro", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+    with tqdm(total=100, desc="Running Pre setup Macro", bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|') as pbar:
         dbt = dbtRunner()
         stdout_capture = StringIO()
         stderr_capture = StringIO()
@@ -365,7 +363,7 @@ def run_dbt_args(cli_args, dbname, schemaname, tablename):
     
     if is_compile:
         model_count = get_dbt_models_count()
-        with tqdm(total=model_count, desc="🔨 Compiling dbt models", bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} models') as pbar:
+        with tqdm(total=model_count, desc="Compiling dbt models", bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}| {n_fmt}/{total_fmt} models') as pbar:
             dbt = dbtRunner()
             
             # Simulate compilation progress
@@ -394,7 +392,7 @@ def run_dbt_args(cli_args, dbname, schemaname, tablename):
             pbar.set_description("✅ dbt compilation completed" if result.success else "❌ dbt compilation failed")
     else:
         # For non-compile operations, use simple progress
-        with tqdm(total=100, desc="🔨 Running dbt command", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+        with tqdm(total=100, desc="Running dbt command", bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|') as pbar:
             dbt = dbtRunner()
             stdout_capture = StringIO()
             stderr_capture = StringIO()
@@ -416,7 +414,7 @@ def zip_directory(source_dir, zip_path):
         total_files += len(files)
     
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        with tqdm(total=total_files, desc="📦 Creating archive", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+        with tqdm(total=total_files, desc="Creating archive", bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|') as pbar:
             for root, _, files in os.walk(source_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
@@ -440,7 +438,7 @@ def run_sqlfluff_on_directory(directory_path):
             return True
         
         success_count = 0
-        with tqdm(total=len(sql_files), desc="✨ Applying SQLFluff", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+        with tqdm(total=len(sql_files), desc="Applying SQLFluff", bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|') as pbar:
             for sql_file in sql_files:
                 try:
                     # Run SQLFluff on individual file
@@ -496,7 +494,7 @@ def generate_notebooks():
                         if folder_name != "models":
                             model_folders.add(folder_name)
 
-        with tqdm(total=len(model_folders), desc="📓 Generating notebooks", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+        with tqdm(total=len(model_folders), desc="📓 Generating notebooks", bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|') as pbar:
             for folder in model_folders:
                 if folder == "models":
                     continue
@@ -631,7 +629,7 @@ def process_compiled_sql_files():
             if file.endswith(".sql"):
                 sql_files.append(os.path.join(root, file))
     
-    with tqdm(total=len(sql_files), desc="🔄 Transforming SQL files", bar_format='{desc}: {percentage:3.0f}%|{bar}|') as pbar:
+    with tqdm(total=len(sql_files), desc="Transforming SQL files", bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|') as pbar:
         for sql_file in sql_files:
             transform_compiled_sql(sql_file)
             pbar.update(1)
@@ -732,7 +730,6 @@ def main():
     line1 = border
     line2 = " " + text.center(width - 2)
     line3 = ("*" * (len(line2) // 3)).center(width - 2)
-    line4 = "Establishing Connection "
     print(line1)
     print(line2)
     print(line3)
@@ -744,11 +741,10 @@ def main():
     def checking():
         connection = connection_check(dbname,schemaname,tablename)
         if connection.success:
-            rotating_slash_after(line4,8,1)
-            print("\u263A Connection Established Successfully! ✅")
+            # rotating_slash_after(line4,8,1)
+            print("\U0001F642 Connection Established Successfully! \u2714")
         if not connection.success:
-            rotating_slash_after(line4,8,1)
-            print("\u2639 Connection Failed! ❌")
+            print("\U0001F641 Connection Failed! \u274C")
             blinking_dots_input("Update Your Profiles.yml correctly and Press Enter to check the connection again ")
             checking()
     checking()
@@ -759,29 +755,68 @@ def main():
         print(f"❌ Mapping file not found at the specified path: {mapping_file}")
         sys.exit(1)
 
+    text = f"Database Platform | Snowball Version!"
+    width = len(text) + 8  # padding for stars
+    border = "*" * width
+
+    # Prepare the lines to print
+    line1 = border
+    line2 = " " + text.center(width - 2)
+    line3 = ("*" * (len(line2) // 3)).center(width - 2)
+    print(line1)
+    print(line2)
+    print(line3)
+
     copy_seed_file(mapping_file, dbt_seed_dir, dbname, schemaname, tablename)
-    print("What would you like to do?")
-    print("1: Package the full dbt project")
-    print("2: Compile the SQL project code")
-    print("3: Get the pyspark notebooks for compiled SQL")
+    print("Select the Database Platform")
+    print("     1: Snowflake")
+    print("     2: Databricks")
+    print("     3: Fabric")
+    print("     4: SQL databse")
+    print("     5: Redshift --In Progress")
+
 
     try:
-        user_choice = int(input("Enter your choice (1, 2 or 3): ").strip())
+        user_choice = int(input("\nSelect your Database Platform [1-5]: ").strip())
     except ValueError:
-        print("❌ Invalid input. Please enter 1, 2 or 3.")
+        print("❌ Invalid input. Please enter [1-5].")
         return
+    
+    print(line3)
+    print("Select the Snowball Version")
+    print("     1: dbt")
+    print("     2: sql")
+    print("     3: Spark sql")
+    print("     4: Redshift - N/A")
 
-    if user_choice == 1:
+    final_text = "Happy Coding! Please contact Snowball Product team for any Support! \U0001F642"
+    # Get terminal width
+    term_width = shutil.get_terminal_size().columns
+    try:
+        user_choice_version = int(input("\nSelect your Snowball Version: ").strip())
+    except ValueError:
+        print("❌ Invalid input. Please enter [1-4].")
+        return
+    
+    print(line1)
+    if user_choice_version == 1:
+        if user_choice == 1:
+            text = "\n Generating Snowfalke adaptable dbt code "
+        if user_choice == 2:
+            text = "\n Generating Databricks adaptable dbt code ..."
+        if user_choice == 3:
+            text = "\n Generating Fanric adaptable dbt code ..."
         try:
-            print("\n📦 Packaging the full dbt project...")
+            rotating_slash_after(text, duration_sec=10, passed=1)
+            output_zip    = os.path.join(output_dir, "snowball_dbt.zip")
             zip_directory(project_dir, output_zip)
-            print(f"\n✅ Your full dbt project has been packaged successfully!")
-            print(f"📦 Zipped dbt project saved at: {output_zip}")
+            print(f"snowball_dbt code is saved at: {output_zip}\n")
+            print(final_text.center(term_width, '*'))
         except Exception as e:
             print(f"❌ Failed to zip dbt project: {e}")
 
-    elif user_choice == 2:
-        print("\n🔄 Starting SQL compilation process...\n")
+    elif user_choice_version == 2:
+        print("\nGenerating SQL code...\n")
         
         deps_result = run_dbt_deps(dbname, schemaname, tablename)
         if not deps_result.success:
@@ -789,6 +824,7 @@ def main():
             return
         
         try:
+            output_zip    = os.path.join(output_dir, "snowball_sql.zip")
             macro_result = run_pre_run_setup(dbname, schemaname, tablename)
             if not macro_result.success:
                 print("❌ Pre-run setup macro failed")
@@ -809,18 +845,18 @@ def main():
         if compile_result.success:
             sqlfluff_success = apply_sqlfluff_to_compiled()
             if not sqlfluff_success:
-                with tqdm(desc="⚠️ SQLFluff issues detected", bar_format='{desc}') as pbar:
+                with tqdm(desc="SQLFluff issues detected", bar_format='{desc}') as pbar:
                     time.sleep(1)
                     
             process_compiled_sql_files()
             zip_directory(compiled_dir, output_zip)
-            print(f"\n✅ Process completed successfully!")
-            print(f"📦 Compiled & formatted SQL files zipped at: {output_zip}")
+            print(f"snowball_sql code is generated successfully and saved at: {output_zip}\n")
+            print(final_text.center(term_width, '*'))
         else:
             print("❌ dbt compile failed")
 
     elif user_choice == 3:
-        print("\n🔄 Starting notebook generation process...\n")
+        print("\nGenerating Spark SQL notebooks...\n")
         
         deps_result = run_dbt_deps(dbname, schemaname, tablename)
         if not deps_result.success:
@@ -828,6 +864,7 @@ def main():
             return
             
         try:
+            output_zip    = os.path.join(output_dir, "snowball_spark.zip")
             macro_result = run_pre_run_setup(dbname, schemaname, tablename)
             if not macro_result.success:
                 print("❌ Pre-run setup macro failed")
@@ -856,15 +893,14 @@ def main():
             if os.path.exists(output_zip):
                 os.remove(output_zip)
             zip_directory(notebooks_dir, output_zip)
-            print(f"\n✅ Process completed successfully!")
-            print(f"📓 Notebooks saved to: {notebooks_dir}")
-            print(f"📦 Notebooks zipped at: {output_zip}")
+            print(f"Snowball Spark SQL Notebooks are zipped and saved at: {output_zip}\n")
+            print(final_text.center(term_width, '*'))
 
         else:
             print("❌ dbt compile failed")
-
+    
     else:
-        print("❌ Invalid choice. Please enter either 1, 2 or 3.")
+        print("❌ Invalid choice. Please enter [1-4]")
 
 if __name__ == "__main__":
     main()
