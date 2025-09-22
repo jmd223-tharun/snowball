@@ -28,8 +28,6 @@ from io import StringIO
 
 # === Set OS path & environment variables === #
 os.environ["DBT_PROFILES_DIR"] = profiles_dir
-project_root = project_dir
-os.chdir(project_root)
 
 project_dir  = os.path.join(project_dir, "snowball_dbt")
 compiled_dir  = os.path.join(project_dir, "target", "compiled")
@@ -422,7 +420,7 @@ def zip_directory(source_dir, zip_path):
                     zipf.write(file_path, arcname)
                     pbar.update(1)
 
-def run_sqlfluff_on_directory(directory_path):
+def run_sqlfluff_on_directory(directory_path, project_root):
     """
     Run SQLFluff fix on all SQL files in a directory.
     """
@@ -463,7 +461,7 @@ def run_sqlfluff_on_directory(directory_path):
     except Exception:
         return False
 
-def apply_sqlfluff_to_compiled():
+def apply_sqlfluff_to_compiled(project_root):
     """
     Apply SQLFluff to all compiled SQL files before packaging.
     Run SQLFluff on the entire compiled models directory at once for efficiency.
@@ -477,7 +475,7 @@ def apply_sqlfluff_to_compiled():
         return False
     
     # Run SQLFluff on the compiled models directory
-    return run_sqlfluff_on_directory(compiled_dir)
+    return run_sqlfluff_on_directory(compiled_dir, project_root)
 
 def generate_notebooks():
     """Generate Jupyter notebooks from compiled SQL by model folder"""
@@ -719,7 +717,8 @@ def main():
     cleanup_previous_run()
     initial_set_up()
 
-
+    project_root = project_dir
+    os.chdir(project_root)
     text = f"Checking Database Connection!"
     width = len(text) + 8  # padding for stars
     border = "*" * width
@@ -842,7 +841,7 @@ def main():
         compile_result = run_dbt_args(compile_args, dbname, schemaname, tablename)
 
         if compile_result.success:
-            sqlfluff_success = apply_sqlfluff_to_compiled()
+            sqlfluff_success = apply_sqlfluff_to_compiled(project_root)
             if not sqlfluff_success:
                 with tqdm(desc="SQLFluff issues detected", bar_format='{desc}') as pbar:
                     time.sleep(1)
@@ -882,7 +881,7 @@ def main():
         result = run_dbt_args(compile_args, dbname, schemaname, tablename)
 
         if result and result.success:
-            sqlfluff_success = apply_sqlfluff_to_compiled()
+            sqlfluff_success = apply_sqlfluff_to_compiled(project_root)
             if not sqlfluff_success:
                 with tqdm(desc="⚠️ SQLFluff issues detected", bar_format='{desc}') as pbar:
                     time.sleep(1)

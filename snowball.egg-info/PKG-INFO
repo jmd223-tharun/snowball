@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: snowball
-Version: 1.2.1
+Version: 1.2.2
 Summary: Generate compiled dbt projects and PySpark notebooks.
 Home-page: https://gitserver/org/dbt_runner
 Author: Vishal Verma
