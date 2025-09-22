@@ -708,14 +708,14 @@ def copy_csv_to_downloads(src_csv_path: str) -> str:
 
 def main():
     welcome_message()
-    
-    # Clone the latest repo from Snowball dbt
-    mapping_file_path = clone_repo("https://github.com/jmangroup/snowball_dbt.git")
-    copy_csv_to_downloads(mapping_file_path)
 
     # Clean up previous runs
     cleanup_previous_run()
     initial_set_up()
+
+        # Clone the latest repo from Snowball dbt
+    mapping_file_path = clone_repo("https://github.com/jmangroup/snowball_dbt.git")
+    copy_csv_to_downloads(mapping_file_path)
 
     project_root = project_dir
     os.chdir(project_root)
