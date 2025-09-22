@@ -694,13 +694,11 @@ def copy_csv_to_downloads(src_csv_path: str) -> str:
     downloads_dir.mkdir(parents=True, exist_ok=True)
     
     src_path = Path(src_csv_path)
-    print(f"Source{src_path}")
     if not src_path.is_file():
         raise FileNotFoundError(f"Source CSV file not found: {src_csv_path}")
     
     # Destination path keeps the same filename
     dest_path = downloads_dir / src_path.name
-    print(f"Destination{dest_path}")
     # Copy file
     shutil.copy2(src_path, dest_path)
 
@@ -709,14 +707,14 @@ def main():
 
     # Clean up previous runs
     cleanup_previous_run()
-    initial_set_up()
 
         # Clone the latest repo from Snowball dbt
     mapping_file_path = clone_repo("https://github.com/jmangroup/snowball_dbt.git")
     copy_csv_to_downloads(mapping_file_path)
 
+    initial_set_up()
+
     project_root = project_dir
-    os.chdir(project_root)
     text = f"Checking Database Connection!"
     width = len(text) + 8  # padding for stars
     border = "*" * width
