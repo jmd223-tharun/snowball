@@ -13,10 +13,7 @@ from pathlib import Path
 profiles_dir = str(Path.home() / ".dbt")
 project_dir  = str(Path.home() / "Downloads/snowball_dbt")
 mapping_file = str(Path.home() / "Downloads/column_mapping.csv")
-output_dir = str(Path.home() / "Downloads")
-
-
-
+output_dir   = str(Path.home() / "Downloads")
 
 def load_dbt_profile(profile_name: str = "Snowball_dbt", target: str = "dev") -> dict:
     """
@@ -50,15 +47,16 @@ def load_dbt_profile(profile_name: str = "Snowball_dbt", target: str = "dev") ->
             raise ValueError(f"Target '{target}' not found under profile '{profile_name}' in profiles.yml")
 
         db_vars = {
-            "platform": target_profile.get("type", "snowflake"),
-            "database": target_profile.get("database", ""),
-            "schema": target_profile.get("schema", ""),
-            "user": target_profile.get("user", ""),
-            "password": target_profile.get("password", ""),
-            "account": target_profile.get("account", ""),
-            "role": target_profile.get("role", ""),
+            "platform" : target_profile.get("type", "snowflake"),
+            "database" : target_profile.get("database", ""),
+            "schema"   : target_profile.get("schema", ""),
+            "user"     : target_profile.get("user", ""),
+            "password" : target_profile.get("password", ""),
+            "account"  : target_profile.get("account", ""),
+            "role"     : target_profile.get("role", ""),
             "warehouse": target_profile.get("warehouse", ""),
-            "threads": target_profile.get("threads", 1)
+            "type"     : target_profile.get("type", ""),
+            "threads"  : target_profile.get("threads", 1)
         }
 
         return db_vars
@@ -76,9 +74,7 @@ except Exception as err:
     # If you want, you can handle missing profiles gracefully here,
     # for example, set db_vars = {} or print a warning.
     # For now, we raise the error.
-    raise err
-
-    
+    raise err  
 
 # === Steps to proceed === #
 """
