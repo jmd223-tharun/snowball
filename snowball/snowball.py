@@ -29,7 +29,6 @@ from io import StringIO
 # === Set OS path & environment variables === #
 os.environ["DBT_PROFILES_DIR"] = profiles_dir
 
-project_dir  = os.path.join(project_dir, "snowball_dbt")
 compiled_dir  = os.path.join(project_dir, "target", "compiled")
 dbt_seed_dir  = os.path.join(project_dir, "seeds")
 notebooks_dir = os.path.join(output_dir, "notebooks")
