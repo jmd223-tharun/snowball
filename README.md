@@ -75,10 +75,15 @@ snowball.main()
 ## ✨ Features
 
 ✅ Automated dependency installation.
+
 ✅ Programmatic execution of dbt models.
+
 ✅ SQLFluff formatting applied to compiled SQL.
+
 ✅ Transformation of dbt outputs into stored procedure-ready code.
+
 ✅ Automatic generation of PySpark notebooks.
+
 ✅ End-to-end project packaging into a ready-to-share archive.
 
 ## 🤝 Contributing
@@ -101,3 +106,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## 📇 Contact
 
 For any questions or issues, contact Vishal Verma <vishal.verma@jmangroup.com>.
+
