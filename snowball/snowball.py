@@ -796,17 +796,17 @@ def main():
         print("❌ Invalid input. Please enter [1-4].")
         return
     
-    print(line1)
+    print(f"{line1}\n")
     if user_choice_version == 1:
         if user_choice == 1:
-            text = "\n Generating Snowfalke adaptable dbt code "
+            text = "Generating Snowfalke adaptable dbt code "
         if user_choice == 2:
-            text = "\n Generating Databricks adaptable dbt code ..."
+            text = "Generating Databricks adaptable dbt code ..."
         if user_choice == 3:
-            text = "\n Generating Fanric adaptable dbt code ..."
-        rotating_slash_after(text, 10)
-        rotating_slash_after('test', 5)
+            text = "Generating Fanric adaptable dbt code ..."
+
         try:
+            rotating_slash_after(text, 10)
             output_zip    = os.path.join(output_dir, "snowball_dbt.zip")
             zip_directory(project_dir, output_zip)
             print(f"snowball_dbt code is saved at: {output_zip}\n")
@@ -854,7 +854,7 @@ def main():
         else:
             print("❌ dbt compile failed")
 
-    elif user_choice == 3:
+    elif user_choice_version == 3:
         print("\nGenerating Spark SQL notebooks...\n")
         
         deps_result = run_dbt_deps(dbname, schemaname, tablename)
@@ -897,7 +897,8 @@ def main():
 
         else:
             print("❌ dbt compile failed")
-    
+    elif user_choice_version == 4:
+        print("\nRedshift Version is in Progress! Please contact Snowball product team.")
     else:
         print("❌ Invalid choice. Please enter [1-4]")
 
