@@ -645,8 +645,8 @@ def clone_repo(git_url: str) -> str:
         
     """
     repo_name = os.path.splitext(os.path.basename(git_url))[0]
-    clone_location = os.path.join(os.getcwd(), repo_name)
-    clone_path = os.path.join(os.getcwd(), repo_name)
+    clone_location = os.path.join(Path.home(), "Downloads", repo_name)
+    clone_path = os.path.join(Path.home(), "Downloads", repo_name)
 
     
     # If folder exists, remove it properly
@@ -674,7 +674,7 @@ def clone_repo(git_url: str) -> str:
     
     # Change to the cloned directory
     os.chdir(clone_path)
-    
+    print(clone_path)
     return os.path.join(clone_location, 'seeds', 'column_mapping.csv')
 
 
