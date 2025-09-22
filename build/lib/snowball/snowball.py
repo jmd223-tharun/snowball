@@ -731,6 +731,8 @@ def main():
     dbname = db_config.get("database")
     schemaname = db_config.get("schema")
 
+    print(f"Revenue table: {dbname}.{schemaname}.{tablename}")
+    
     def checking():
         connection = connection_check(dbname,schemaname,tablename)
         if connection.success:
