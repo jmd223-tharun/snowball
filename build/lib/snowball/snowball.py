@@ -673,8 +673,7 @@ def clone_repo(git_url: str) -> str:
         raise Exception(f"Failed to clone repository: {str(e)}")
     
     # Change to the cloned directory
-    os.chdir(clone_path)
-    print(clone_path)
+    # os.chdir(clone_path)
     return os.path.join(clone_location, 'seeds', 'column_mapping.csv')
 
 
@@ -695,16 +694,15 @@ def copy_csv_to_downloads(src_csv_path: str) -> str:
     downloads_dir.mkdir(parents=True, exist_ok=True)
     
     src_path = Path(src_csv_path)
+    print(f"Source{src_path}")
     if not src_path.is_file():
         raise FileNotFoundError(f"Source CSV file not found: {src_csv_path}")
     
     # Destination path keeps the same filename
     dest_path = downloads_dir / src_path.name
-    
-    # with tqdm(desc="📥 Copying to Downloads", bar_format='{desc}: Processing...') as pbar:
-    #     # Copy file
-    #     shutil.copy2(src_path, dest_path)
-    #     pbar.set_description("✅ Copied to Downloads")
+    print(f"Destination{dest_path}")
+    # Copy file
+    shutil.copy2(src_path, dest_path)
 
 def main():
     welcome_message()
