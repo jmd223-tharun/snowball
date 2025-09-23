@@ -105,7 +105,7 @@ def initial_set_up():
     line2 = " " + text.center(width - 2)
     line3 = ("*" * (len(line2) // 3)).center(width - 2)
     line4 = "1. Collecting latest repo from Git "
-    line5 = f"2. Column mapping file has been downloaded to {Path.home()}/Downloads/column_mapping.csv "
+    line5 = f"2. Column mapping file has been downloaded to {Path.home()}\Downloads\column_mapping.csv "
     line6 = "3. Please update Column mapping file as per your revenue data and save it to Downloads"
     line7 = "4. Create a folder .dbt in the root directory and create a profiles.yml file"
     line8 = "5. Update profiles.yml with your database credentials - Please refer Readme for more details [https://github.com/jmangroup/snowball_dbt#]"
