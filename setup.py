@@ -11,7 +11,7 @@ except FileNotFoundError:
 
 setup(
     name="snowball",      
-    version="1.3.0",                            # Package version
+    version="1.3.1",                            # Package version
     description="Generate compiled dbt projects and PySpark notebooks.",
     long_description=long_description,          # Long description (usually README content)
     long_description_content_type="text/markdown",
@@ -31,9 +31,9 @@ setup(
         "dbt-databricks"
 
     ],
-    entry_points={                              # Makes a console command available after install
+    entry_points={
         'console_scripts': [
-            'run-dbt=dbt_runner.run_dbt:main',
+            'snowball = snowball:snowball.main',
         ],
     },
     classifiers=[                               

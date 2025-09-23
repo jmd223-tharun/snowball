@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: snowball
-Version: 1.2.7
+Version: 1.3.1
 Summary: Generate compiled dbt projects and PySpark notebooks.
 Home-page: https://gitserver/org/dbt_runner
 Author: Vishal Verma
@@ -31,54 +31,112 @@ Dynamic: requires-dist
 Dynamic: requires-python
 Dynamic: summary
 
-# dbt_runner
+# ❄️ Snowball Package  
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)]
+Snowball is a centralized, cross-platform package designed to generate **dbt-based code** seamlessly across multiple platforms such as **SQL Server, Snowflake, Databricks, Fabric**, and more.  
+Whether the output format is **Spark SQL notebooks** or **plain SQL scripts**, Snowball bundles everything you need—including required libraries and dependencies—to connect with dbt scripts and generate platform-specific code versions.  
 
-## Overview
+---
 
-`dbt_runner` is a Python package for automating the compilation, formatting, and packaging of dbt projects. It also generates PySpark notebooks from compiled SQL files. This tool streamlines Snowball ARR-related dbt workflows.
+## 📚 Table of Contents  
 
-## Features
+- [Overview](#-overview)  
+- [Requirements](#-requirements)  
+- [Setup Instructions](#-setup-instructions)  
+- [Features](#-features)  
+- [Contributing](#-contributing)  
+- [Upcoming Enhancements](#-upcoming-enhancements)  
+- [License](#-license)  
+- [Contact](#-contact)  
 
-- Install dependencies and run dbt models programmatically
-- Compile dbt projects and apply SQLFluff formatting
-- Transform compiled SQL files into stored procedure format
-- Generate PySpark notebooks for compiled SQL models
-- Package the entire project as a zipped archive for distribution
+---
 
-## Installation
+## 📖 Overview  
+
+`dbt_runner` (part of the Snowball ecosystem) is a **Python-based automation tool** that:  
+- Compiles and formats dbt projects.  
+- Generates **PySpark notebooks** from compiled SQL files.  
+- Packages dbt workflows into a ready-to-distribute archive.  
+
+With Snowball, you can streamline **Analytics, Reporting, and R&D workflows** with minimal manual effort.  
+
+---
+
+## ⚙️ Requirements  
+
+- **Python 3.7+**  
+- Required dependencies (installed automatically with pip):  
+  - `dbt-core`  
+  - `sqlfluff`  
+  - `nbformat`  
+  - `pyspark`  
+
+---
+
+## 🚀 Setup Instructions  
+
+### 1️⃣ Install the snowball git package using pip install command
 
 Install directly from your organization's private Git repository:
+```bash
+pip install git+https://github.com/jmangroup/snowball.git
+```
 
+ - This installs the latest snowball_dbt code along with a prebuilt column_mapping.csv in your Downloads folder (used for mapping dimensions).
 
-## Usage
+### 2️⃣ Trigger the main Snowball function by -
 
-After installation, run the CLI tool:
+```bash
+py
+import snowball import snowball
+snowball.main()
+```
 
+### 3️⃣ Configure Column Mapping & DBT Profile
 
-Follow the interactive prompts to:
-- Package the full dbt project
-- Compile the SQL project code
-- Generate PySpark notebooks from compiled SQL
+ - Update column_mapping.csv with your required dimensions.
+ - Edit your profiles.yml at:
+ ```bash
+ C:\Users\{UserName}\.dbt\profiles.yml
+ ```
 
-Alternatively, import `run_dbt` module in your Python code:
+ This ensures Snowball connects to your target data platform for the snowball_dbt project.
 
+### 4️⃣ Continue the process , Choose your data platform and your required version
+ - Snowball will automatically generate a zipped project folder in your Downloads directory.
 
-## Requirements
+## ✨ Features
 
-- Python 3.7 or newer
-- Dependencies installed automatically via `pip` (dbt-core, sqlfluff, nbformat, pyspark)
+✅ Automated dependency installation.
 
-## Contributing
+✅ Programmatic execution of dbt models.
 
-Contributions are welcome! Please fork the repository and create a pull request.
+✅ SQLFluff formatting applied to compiled SQL.
 
-## License
+✅ Transformation of dbt outputs into stored procedure-ready code.
+
+✅ Automatic generation of PySpark notebooks.
+
+✅ End-to-end project packaging into a ready-to-share archive.
+
+## 🤝 Contributing
+
+ - We welcome contributions!
+ - Fork the repository.
+ - Implement your enhancements.
+ - Submit a pull request for review.
+
+## 📅 Upcoming Features
+
+* 🚀 One-click execution of Snowball workflows (remove multi-step triggers).
+* ⚡ Optimized performance of the Snowball Python package.
+* 📊 Extended support for additional data platforms.
+
+## 📜 License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-## Contact
+## 📇 Contact
 
 For any questions or issues, contact Vishal Verma <vishal.verma@jmangroup.com>.
 

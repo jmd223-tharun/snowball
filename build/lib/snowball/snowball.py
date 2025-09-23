@@ -29,7 +29,6 @@ from io import StringIO
 # === Set OS path & environment variables === #
 os.environ["DBT_PROFILES_DIR"] = profiles_dir
 
-project_dir  = os.path.join(project_dir, "snowball_dbt")
 compiled_dir  = os.path.join(project_dir, "target", "compiled")
 dbt_seed_dir  = os.path.join(project_dir, "seeds")
 notebooks_dir = os.path.join(output_dir, "notebooks")
@@ -77,7 +76,6 @@ def rotating_slash_after(text, duration_sec=5, passed=1):
         print_msg = f"{text} {red_color}Failed {red_cross}{reset_color}\n"
     sys.stdout.write('\r' + print_msg)
     sys.stdout.flush()
-
 
 def blinking_dots_input(base_text="Press Enter to continue"):
     dots = ['', '.', '..', '...']
@@ -127,8 +125,6 @@ def initial_set_up():
     print("\n")
     print(line1)
     print("\n")
-
-
 
 def show_progress(desc, duration=None, steps=None):
     """Show a progress bar for a given operation"""
@@ -191,6 +187,39 @@ def run_dbt_deps(dbname, schemaname, tablename):
         pbar.update(80)
         
         pbar.set_description("Dependencies installed" if result.success else "❌ Dependencies failed")
+    
+    return result
+
+def run_dbt_seed(dbname, schemaname, tablename):
+    """Run dbt seed to update the user mapping file"""
+    vars_dict = {
+        'my_database': dbname,
+        'my_schema': schemaname,
+        'my_table': tablename
+    }
+    vars_str = json.dumps(vars_dict)
+    deps_args = [
+        "seed",
+        "--select", "column_mapping",
+        "--project-dir", project_dir,
+        "--profiles-dir", profiles_dir,
+        "--vars", vars_str
+    ]
+    
+    # Show progress bar with estimated steps
+    with tqdm(total=100, desc="Updating mapping file", bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|') as pbar:
+        dbt = dbtRunner()
+        # Capture stdout/stderr to suppress logs
+        stdout_capture = StringIO()
+        stderr_capture = StringIO()
+        
+        # Simulate progress during dependency installation
+        pbar.update(20)
+        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            result = dbt.invoke(deps_args)
+        pbar.update(80)
+        
+        pbar.set_description("Updated mapping file" if result.success else "❌ Failed to map seed file")
     
     return result
 
@@ -552,14 +581,9 @@ def copy_seed_file(seed_path, target_dir,dbname, schemaname, tablename):
             # Copy the file (will overwrite if exists)
             shutil.copy(seed_path, target_file)
         
-        # Run dbt seed to load the seed file
-        stdout_capture = StringIO()
-        stderr_capture = StringIO()
-        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-            run_dbt_args(["seed", "--select", "column_mapping"], dbname, schemaname, tablename)
-            
+        run_dbt_seed(dbname, schemaname, tablename)
         return True
-        
+
     except FileNotFoundError:
         with tqdm(desc="❌ Mapping file not found", bar_format='{desc}') as pbar:
             time.sleep(1)
@@ -701,6 +725,13 @@ def copy_csv_to_downloads(src_csv_path: str) -> str:
     dest_path = downloads_dir / src_path.name
     # Copy file
     shutil.copy2(src_path, dest_path)
+    
+    try:
+        os.chmod(dest_path, 0o666)  # read/write for owner, read for group/others
+    except Exception as e:
+        print(f"Warning: Could not set permissions on {dest_path}: {e}")
+    
+    return str(dest_path)
 
 def main():
     welcome_message()
@@ -708,7 +739,7 @@ def main():
     # Clean up previous runs
     cleanup_previous_run()
 
-        # Clone the latest repo from Snowball dbt
+    # Clone the latest repo from Snowball dbt
     mapping_file_path = clone_repo("https://github.com/jmangroup/snowball_dbt.git")
     copy_csv_to_downloads(mapping_file_path)
 
@@ -730,25 +761,43 @@ def main():
     db_config = load_dbt_profile("Snowball_dbt", "dev")
     dbname = db_config.get("database")
     schemaname = db_config.get("schema")
+    type = db_config.get("type")
 
     print(f"Revenue table: {dbname}.{schemaname}.{tablename}")
     
+    print("Available Database Platform")
+    print("     1: Snowflake")
+    print("     2: Databricks")
+    print("     3: Fabric")
+    print("     4: SQL databse")
+    print("     5: Redshift --In Progress")
+
+    platform_dict = {
+        1: "snowflake",
+        2: "databricks",
+        3: "fabric",
+        4: "sqlserver",
+        5: "redshift"
+    }
+    user_choice = int(input("\nSelect your Database Platform [1-5]: ").strip())
+    while():
+        try:
+            if user_choice in [1, 2, 3, 4, 5]:
+                break
+            else: user_choice = int(input("❌ Invalid input. Please enter [1-5]: ").strip())
+        except ValueError:
+            print("❌ Invalid input. Please enter [1-5].")
+
     def checking():
         connection = connection_check(dbname,schemaname,tablename)
+        if not connection.success or type != platform_dict.get(user_choice):
+            print("\U0001F641 Connection Failed! \n")
+            blinking_dots_input("Update Your Profiles.yml correctly and Press Enter to check the connection again!! ")
+            checking()
         if connection.success:
             # rotating_slash_after(line4,8,1)
             print("\U0001F642 Connection Established Successfully! \n")
-        if not connection.success:
-            print("\U0001F641 Connection Failed! \n")
-            blinking_dots_input("Update Your Profiles.yml correctly and Press Enter to check the connection again ")
-            checking()
     checking()
-        
-        
-
-    if not os.path.exists(mapping_file):
-        print(f"❌ Mapping file not found at the specified path: {mapping_file}")
-        sys.exit(1)
 
     text = f"Database Platform | Snowball Version!"
     width = len(text) + 8  # padding for stars
@@ -762,21 +811,17 @@ def main():
     print(line2)
     print(line3)
 
-    copy_seed_file(mapping_file, dbt_seed_dir, dbname, schemaname, tablename)
-    print("Available Database Platform")
-    print("     1: Snowflake")
-    print("     2: Databricks")
-    print("     3: Fabric")
-    print("     4: SQL databse")
-    print("     5: Redshift --In Progress")
-
-
-    try:
-        user_choice = int(input("\nSelect your Database Platform [1-5]: ").strip())
-    except ValueError:
-        print("❌ Invalid input. Please enter [1-5].")
+    deps_result = run_dbt_deps(dbname, schemaname, tablename)
+    if not deps_result.success:
+        print("❌ dbt deps failed")
         return
-    
+
+    if not os.path.exists(mapping_file):
+        print(f"❌ Mapping file not found at the specified path: {mapping_file}")
+        sys.exit(1)
+
+    copy_seed_file(mapping_file, dbt_seed_dir, dbname, schemaname, tablename)
+
     print(line3)
     print("Available Snowball Version")
     print("     1: dbt")
@@ -796,7 +841,7 @@ def main():
     print(f"{line1}\n")
     if user_choice_version == 1:
         if user_choice == 1:
-            text = "Generating Snowfalke adaptable dbt code "
+            text = "Generating Snowflake adaptable dbt code "
         if user_choice == 2:
             text = "Generating Databricks adaptable dbt code ..."
         if user_choice == 3:
@@ -813,11 +858,6 @@ def main():
 
     elif user_choice_version == 2:
         print("\nGenerating SQL code...\n")
-        
-        deps_result = run_dbt_deps(dbname, schemaname, tablename)
-        if not deps_result.success:
-            print("❌ dbt deps failed")
-            return
         
         try:
             output_zip    = os.path.join(output_dir, "snowball_sql.zip")
@@ -853,14 +893,9 @@ def main():
 
     elif user_choice_version == 3:
         print("\nGenerating Spark SQL notebooks...\n")
-        
-        deps_result = run_dbt_deps(dbname, schemaname, tablename)
-        if not deps_result.success:
-            print("❌ dbt deps failed")
-            return
             
         try:
-            output_zip    = os.path.join(output_dir, "snowball_spark.zip")
+            output_zip = os.path.join(output_dir, "snowball_spark.zip")
             macro_result = run_pre_run_setup(dbname, schemaname, tablename)
             if not macro_result.success:
                 print("❌ Pre-run setup macro failed")
