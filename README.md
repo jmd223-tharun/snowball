@@ -1,6 +1,6 @@
 # ❄️ Snowball Package  
 
-Snowball is a centralized, cross-platform package designed to generate **dbt-based code** seamlessly across multiple platforms such as **SQL Server, Snowflake, Databricks, Fabric**, and more.  
+Snowball is a centralized, cross-platform package designed to generate **dbt-based code** seamlessly across multiple platforms such as **SQL Server, Snowflake, Databricks, Fabric**, **RedShift** and more.  
 Whether the output format is **Spark SQL notebooks** or **plain SQL scripts**, Snowball bundles everything you need—including required libraries and dependencies—to connect with dbt scripts and generate platform-specific code versions.  
 
 ---
@@ -51,12 +51,10 @@ pip install git+https://github.com/jmangroup/snowball.git
 
  - This installs the latest snowball_dbt code along with a prebuilt column_mapping.csv in your Downloads folder (used for mapping dimensions).
 
-### 2️⃣ Trigger the main Snowball function by -
+### 2️⃣ Trigger the main Snowball function by entering -
 
 ```bash
-py
-import snowball import snowball
-snowball.main()
+snowball
 ```
 
 ### 3️⃣ Configure Column Mapping & DBT Profile
@@ -106,4 +104,5 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## 📇 Contact
 
 For any questions or issues, contact Vishal Verma <vishal.verma@jmangroup.com>.
+
 
