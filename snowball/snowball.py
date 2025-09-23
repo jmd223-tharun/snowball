@@ -25,6 +25,7 @@ from tqdm import tqdm
 import threading
 from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
+from rich.progress import Progress, BarColumn, TextColumn
 
 # === Set OS path & environment variables === #
 os.environ["DBT_PROFILES_DIR"] = profiles_dir
@@ -38,6 +39,7 @@ bar_width = term_width // 4
 ############  Formatting Functions ##############
 
 def welcome_message():
+    print("\n")
     message = "Welcome to Snowball Product!"
     width = len(message) + 8  # padding for stars
     border = "*" * width
@@ -239,22 +241,25 @@ def connection_check(dbname, schemaname, tablename):
     ]
     
     # Show progress bar with estimated steps
-    with tqdm(
-        total=100,
-        desc="Establishing Connection",
-        colour="green",   # Set bar color to green
-        bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|'
+    with Progress(
+    TextColumn("{task.description}"),
+    TextColumn(": {task.percentage:>3.0f}%"),
+    TextColumn("|"),
+    BarColumn(bar_width=bar_width, style="green", complete_style="green"),
+    TextColumn("|"),
     ) as pbar:
+        task = pbar.add_task("Establishing Connection", total=100)
+
         dbt = dbtRunner()
         # Capture stdout/stderr to suppress logs
         stdout_capture = StringIO()
         stderr_capture = StringIO()
         
         # Simulate progress during dependency installation
-        pbar.update(20)
+        pbar.update(task,20)
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
             result = dbt.invoke(debug_args)
-        pbar.update(80)
+        pbar.update(task,80)
         
         pbar.set_description("Establishing Connection" if result.success else "❌ Failed")
     
