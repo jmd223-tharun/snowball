@@ -232,39 +232,35 @@ def connection_check(dbname, schemaname, tablename):
         'my_schema': schemaname,
         'my_table': tablename
     }
-    # dbt expects a yaml/JSON string, wrap in single quotes
-    vars_str = "'" + json.dumps(vars_dict) + "'"
-
+    vars_str = json.dumps(vars_dict)
     debug_args = [
         "debug",
         "--project-dir", project_dir,
         "--profiles-dir", profiles_dir,
         "--vars", vars_str
     ]
+    
+    # Show progress bar with estimated steps
 
-    with Progress(
-        TextColumn("{task.description}"),
-        TextColumn(": {task.percentage:>3.0f}%"),
-        TextColumn("|"),
-        BarColumn(bar_width=bar_width, style="green", complete_style="green"),
-        TextColumn("|"),
+    with tqdm(
+        total=100,
+        desc="Establishing Connection",
+        colour="green",   # Set bar color to green
+        bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|'
     ) as pbar:
-        task = pbar.add_task("Establishing Connection", total=100)
-
         dbt = dbtRunner()
+        # Capture stdout/stderr to suppress logs
         stdout_capture = StringIO()
         stderr_capture = StringIO()
-
-        # Advance progress in steps
-        pbar.update(task, advance=20)
+        
+        # Simulate progress during dependency installation
+        pbar.update(20)
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
             result = dbt.invoke(debug_args)
-        pbar.update(task, advance=60)
-
-        # Update description with status
-        status = "✅ Connection Established" if result.success else "❌ Failed"
-        pbar.update(task, advance=20, description=status)
-
+        pbar.update(80)
+        
+        pbar.set_description("Establishing Connection" if result.success else "❌ Failed")
+    
     return result
 
 def run_dbt(dbname, schemaname, tablename):
