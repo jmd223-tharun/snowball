@@ -11,7 +11,7 @@ except FileNotFoundError:
 
 setup(
     name="snowball",      
-    version="1.3.1",                            # Package version
+    version="1.3.2",                            # Package version
     description="Generate compiled dbt projects and PySpark notebooks.",
     long_description=long_description,          # Long description (usually README content)
     long_description_content_type="text/markdown",

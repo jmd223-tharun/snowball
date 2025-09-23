@@ -239,7 +239,12 @@ def connection_check(dbname, schemaname, tablename):
     ]
     
     # Show progress bar with estimated steps
-    with tqdm(total=100, desc="Establishing Connection", bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|') as pbar:
+    with tqdm(
+        total=100,
+        desc="Establishing Connection",
+        colour="green",   # Set bar color to green
+        bar_format='{desc}: {percentage:3.0f}%|{bar:' + str(bar_width) + '}|'
+    ) as pbar:
         dbt = dbtRunner()
         # Capture stdout/stderr to suppress logs
         stdout_capture = StringIO()
