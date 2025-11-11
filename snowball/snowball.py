@@ -25,7 +25,6 @@ from tqdm import tqdm
 import threading
 from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
-from rich.progress import Progress, BarColumn, TextColumn
 
 # === Set OS path & environment variables === #
 os.environ["DBT_PROFILES_DIR"] = profiles_dir
